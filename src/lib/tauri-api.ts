@@ -8,10 +8,11 @@ import {
   McpServer,
   McpServerSpec,
   McpConfigResponse,
+  DroidProvider,
 } from "../types";
 
 // 应用类型
-export type AppType = "claude" | "codex";
+export type AppType = "claude" | "codex" | "droid";
 
 // 定义配置状态类型
 interface ConfigStatus {
@@ -618,6 +619,127 @@ export const tauriAPI = {
     } catch (error) {
       console.error("打开文件对话框失败:", error);
       return null;
+    }
+  },
+
+  // Droid 相关 API
+  // 获取所有 Droid providers
+  getDroidProviders: async (): Promise<DroidProvider[]> => {
+    try {
+      return await invoke("get_droid_providers");
+    } catch (error) {
+      console.error("获取 Droid providers 失败:", error);
+      return [];
+    }
+  },
+
+  // 获取当前 Droid provider ID
+  getCurrentDroidProvider: async (): Promise<string> => {
+    try {
+      return await invoke("get_current_droid_provider");
+    } catch (error) {
+      console.error("获取当前 Droid provider 失败:", error);
+      return "";
+    }
+  },
+
+  // 添加 Droid provider
+  addDroidProvider: async (provider: DroidProvider): Promise<boolean> => {
+    try {
+      return await invoke("add_droid_provider", { provider });
+    } catch (error) {
+      console.error("添加 Droid provider 失败:", error);
+      throw error;
+    }
+  },
+
+  // 更新 Droid provider
+  updateDroidProvider: async (provider: DroidProvider): Promise<boolean> => {
+    try {
+      return await invoke("update_droid_provider", { provider });
+    } catch (error) {
+      console.error("更新 Droid provider 失败:", error);
+      throw error;
+    }
+  },
+
+  // 删除 Droid provider
+  deleteDroidProvider: async (id: string): Promise<boolean> => {
+    try {
+      return await invoke("delete_droid_provider", { id });
+    } catch (error) {
+      console.error("删除 Droid provider 失败:", error);
+      throw error;
+    }
+  },
+
+  // 切换 Droid provider
+  switchDroidProvider: async (id: string): Promise<boolean> => {
+    try {
+      return await invoke("switch_droid_provider", { id });
+    } catch (error) {
+      console.error("切换 Droid provider 失败:", error);
+      throw error;
+    }
+  },
+
+  // 查询 Droid provider 余额
+  fetchDroidBalance: async (apiKey: string): Promise<any> => {
+    try {
+      return await invoke("fetch_droid_balance", { apiKey: apiKey });
+    } catch (error) {
+      console.error("查询 Droid 余额失败:", error);
+      throw error;
+    }
+  },
+
+  // 批量查询多个 API Key 的余额
+  fetchMultipleDroidBalances: async (apiKeys: string[]): Promise<any[]> => {
+    try {
+      return await invoke("fetch_multiple_droid_balances", { apiKeys });
+    } catch (error) {
+      console.error("批量查询 Droid 余额失败:", error);
+      throw error;
+    }
+  },
+
+  // 根据策略自动切换到下一个 API Key
+  autoSwitchDroidKey: async (providerId: string): Promise<number> => {
+    try {
+      return await invoke("auto_switch_droid_key", { providerId });
+    } catch (error) {
+      console.error("自动切换 API Key 失败:", error);
+      throw error;
+    }
+  },
+
+  // 获取 Factory 配置中的自定义模型
+  getFactoryCustomModels: async (): Promise<any[]> => {
+    try {
+      return await invoke("get_factory_custom_models");
+    } catch (error) {
+      console.error("获取 Factory 自定义模型失败:", error);
+      throw error;
+    }
+  },
+
+  // 删除 Factory 配置中的自定义模型
+  deleteFactoryCustomModel: async (modelDisplayName: string): Promise<void> => {
+    try {
+      await invoke("delete_factory_custom_model", { modelDisplayName });
+    } catch (error) {
+      console.error("删除 Factory 自定义模型失败:", error);
+      throw error;
+    }
+  },
+
+  // 更新 Factory 配置中的自定义模型
+  updateFactoryCustomModel: async (oldDisplayName: string, model: any): Promise<void> => {
+    try {
+      await invoke("update_factory_custom_model", { oldDisplayName, model });
+    } catch (error) {
+      console.error("更新 Factory 自定义模型失败:", error);
+      throw error;
     }
   },
 

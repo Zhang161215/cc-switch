@@ -1,5 +1,5 @@
 import { AppType } from "../lib/tauri-api";
-import { ClaudeIcon, CodexIcon } from "./BrandIcons";
+import { ClaudeIcon, CodexIcon, DroidIcon } from "./BrandIcons";
 
 interface AppSwitcherProps {
   activeApp: AppType;
@@ -45,6 +45,26 @@ export function AppSwitcher({ activeApp, onSwitch }: AppSwitcherProps) {
       >
         <CodexIcon size={16} />
         <span>Codex</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => handleSwitch("droid")}
+        className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+          activeApp === "droid"
+            ? "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-gray-100 dark:shadow-none"
+            : "text-gray-500 hover:text-gray-900 hover:bg-white/50 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800/60"
+        }`}
+      >
+        <DroidIcon 
+          size={16} 
+          className={
+            activeApp === "droid"
+              ? "text-blue-500 dark:text-blue-400"
+              : "text-gray-500 dark:text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400"
+          }
+        />
+        <span>Droid</span>
       </button>
     </div>
   );

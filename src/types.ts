@@ -97,3 +97,58 @@ export interface McpConfigResponse {
   configPath: string;
   servers: Record<string, McpServer>;
 }
+
+// Droid 自定义模型配置
+export interface DroidCustomModel {
+  model_display_name: string;
+  model: string;
+  base_url: string;
+  api_key: string;
+  provider: string;
+  max_tokens?: number;
+  supports_prompt_caching?: boolean;
+}
+
+// Droid 配置（对应 .factory/config.json）
+export interface DroidConfig {
+  custom_models: DroidCustomModel[];
+  default_model?: string;
+  enable_cost_tracking?: boolean;
+  enable_prompt_caching?: boolean;
+}
+
+// Droid Provider（用于管理多个 API Key）
+// API Key 信息
+export interface ApiKeyInfo {
+  id: string;
+  key: string;
+  name?: string; // 可选的标识名称
+  is_active: boolean; // 当前是否在使用
+  last_used?: number; // 最后使用时间
+  balance?: {
+    totalAllowance: number;
+    totalUsed: number;
+    remaining: number;
+    usedRatio: number;
+    lastChecked?: number;
+  };
+}
+
+// 切换策略类型
+export type SwitchStrategy = 'round_robin' | 'use_lowest' | 'use_highest' | 'manual';
+
+export interface DroidProvider {
+  id: string;
+  name: string;
+  api_key: string; // 保留用于兼容，实际使用api_keys
+  api_keys?: ApiKeyInfo[]; // 多个API Key
+  current_key_index?: number; // 当前使用的key索引
+  switch_strategy?: SwitchStrategy; // 切换策略
+  base_url?: string;
+  model?: string;
+  model_display_name?: string;
+  provider?: string;
+  max_tokens?: number;
+  supports_prompt_caching?: boolean;
+  createdAt?: number;
+}

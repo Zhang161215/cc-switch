@@ -4,6 +4,7 @@ mod claude_plugin;
 mod codex_config;
 mod commands;
 mod config;
+mod droid_config;
 mod import_export;
 mod mcp;
 mod migration;
@@ -444,6 +445,19 @@ pub fn run() {
             commands::add_custom_endpoint,
             commands::remove_custom_endpoint,
             commands::update_endpoint_last_used,
+            // Droid configuration management
+            commands::get_droid_providers,
+            commands::get_current_droid_provider,
+            commands::add_droid_provider,
+            commands::update_droid_provider,
+            commands::delete_droid_provider,
+            commands::switch_droid_provider,
+            commands::fetch_droid_balance,
+            commands::fetch_multiple_droid_balances,
+            commands::auto_switch_droid_key,
+            commands::get_factory_custom_models,
+            commands::delete_factory_custom_model,
+            commands::update_factory_custom_model,
             // theirs: config import/export and dialogs
             import_export::export_config_to_file,
             import_export::import_config_from_file,

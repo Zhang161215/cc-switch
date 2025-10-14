@@ -8,6 +8,7 @@ import {
   McpConfigResponse,
   McpServer,
   McpServerSpec,
+  DroidProvider,
 } from "./types";
 import { AppType } from "./lib/tauri-api";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -134,6 +135,19 @@ declare global {
         providerId: string,
         url: string,
       ) => Promise<void>;
+      // Droid 配置管理
+      getDroidProviders: () => Promise<DroidProvider[]>;
+      getCurrentDroidProvider: () => Promise<string>;
+      addDroidProvider: (provider: DroidProvider) => Promise<boolean>;
+      updateDroidProvider: (provider: DroidProvider) => Promise<boolean>;
+      deleteDroidProvider: (id: string) => Promise<boolean>;
+      switchDroidProvider: (id: string) => Promise<boolean>;
+      fetchDroidBalance: (apiKey: string) => Promise<any>;
+    fetchMultipleDroidBalances: (apiKeys: string[]) => Promise<any[]>;
+    autoSwitchDroidKey: (providerId: string) => Promise<number>;
+    getFactoryCustomModels: () => Promise<any[]>;
+    deleteFactoryCustomModel: (modelDisplayName: string) => Promise<void>;
+    updateFactoryCustomModel: (oldDisplayName: string, model: any) => Promise<void>;
     };
     platform: {
       isMac: boolean;

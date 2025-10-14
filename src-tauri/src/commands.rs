@@ -1302,3 +1302,351 @@ pub async fn update_endpoint_last_used(
     state.save()?;
     Ok(())
 }
+
+// ==================== Droid 配置管理 ====================
+
+/// 获取所有 Droid Providers
+#[tauri::command]
+pub async fn get_droid_providers(
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::droid_config::DroidProvider>, String> {
+    let config = state
+        .config
+        .lock()
+        .map_err(|e| format!("获取锁失败: {}", e))?;
+    
+    if let Some(droid_manager) = &config.droid_manager {
+        Ok(droid_manager.providers.clone())
+    } else {
+        Ok(Vec::new())
+    }
+}
+
+/// 获取当前 Droid Provider ID
+#[tauri::command]
+pub async fn get_current_droid_provider(
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let config = state
+        .config
+        .lock()
+        .map_err(|e| format!("获取锁失败: {}", e))?;
+    
+    if let Some(droid_manager) = &config.droid_manager {
+        Ok(droid_manager.current.clone())
+    } else {
+        Ok(String::new())
+    }
+}
+
+/// 添加 Droid Provider
+#[tauri::command]
+pub async fn add_droid_provider(
+    state: State<'_, AppState>,
+    provider: crate::droid_config::DroidProvider,
+) -> Result<(), String> {
+    let mut config = state
+        .config
+        .lock()
+        .map_err(|e| format!("获取锁失败: {}", e))?;
+    
+    if config.droid_manager.is_none() {
+        config.droid_manager = Some(crate::droid_config::DroidManagerConfig::default());
+    }
+    
+    if let Some(droid_manager) = &mut config.droid_manager {
+        droid_manager.providers.push(provider);
+        
+        // 如果是第一个，设置为当前
+        if droid_manager.providers.len() == 1 {
+            droid_manager.current = droid_manager.providers[0].id.clone();
+        }
+    }
+    
+    drop(config);
+    state.save()?;
+    Ok(())
+}
+
+/// 更新 Droid Provider
+#[tauri::command]
+pub async fn update_droid_provider(
+    state: State<'_, AppState>,
+    provider: crate::droid_config::DroidProvider,
+) -> Result<(), String> {
+    let mut config = state
+        .config
+        .lock()
+        .map_err(|e| format!("获取锁失败: {}", e))?;
+    
+    if let Some(droid_manager) = &mut config.droid_manager {
+        if let Some(existing) = droid_manager.providers.iter_mut().find(|p| p.id == provider.id) {
+            // 保存旧的model_display_name用于查找和删除旧配置
+            let old_model_display_name = existing.model_display_name.clone();
+            
+            // 更新provider
+            *existing = provider.clone();
+            
+            // 如果是当前provider，更新到 Factory 配置
+            if droid_manager.current == provider.id {
+                drop(config);
+                
+                // 先删除旧的配置（如果model_display_name改变了）
+                if old_model_display_name != provider.model_display_name {
+                    crate::droid_config::remove_old_factory_model(&old_model_display_name)?;
+                }
+                
+                // 应用新配置
+                crate::droid_config::apply_provider_to_factory(&provider)?;
+                return state.save();
+            }
+        } else {
+            return Err(format!("Provider {} 不存在", provider.id));
+        }
+    } else {
+        return Err("Droid manager 未初始化".to_string());
+    }
+    
+    drop(config);
+    state.save()?;
+    Ok(())
+}
+
+/// 删除 Droid Provider
+#[tauri::command]
+pub async fn delete_droid_provider(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    let mut config = state
+        .config
+        .lock()
+        .map_err(|e| format!("获取锁失败: {}", e))?;
+    
+    if let Some(droid_manager) = &mut config.droid_manager {
+        droid_manager.providers.retain(|p| p.id != id);
+        
+        // 如果删除的是当前provider，清空current
+        if droid_manager.current == id {
+            droid_manager.current = String::new();
+        }
+    }
+    
+    drop(config);
+    state.save()?;
+    Ok(())
+}
+
+/// 切换 Droid Provider
+#[tauri::command]
+pub async fn switch_droid_provider(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    let mut config = state
+        .config
+        .lock()
+        .map_err(|e| format!("获取锁失败: {}", e))?;
+    
+    if let Some(droid_manager) = &mut config.droid_manager {
+        let provider = droid_manager.providers.iter().find(|p| p.id == id)
+            .ok_or_else(|| format!("Provider {} 不存在", id))?
+            .clone();
+        
+        droid_manager.current = id;
+        
+        drop(config);
+        
+        // 应用到 Factory 配置
+        crate::droid_config::apply_provider_to_factory(&provider)?;
+        state.save()?;
+        Ok(())
+    } else {
+        Err("Droid manager 未初始化".to_string())
+    }
+}
+
+/// 查询 Droid Provider 余额
+#[tauri::command]
+pub async fn fetch_droid_balance(api_key: String) -> Result<serde_json::Value, String> {
+    use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, USER_AGENT, ACCEPT};
+    
+    // 构建请求头
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {}", api_key))
+            .map_err(|e| format!("Invalid API key format: {}", e))?
+    );
+    headers.insert(
+        USER_AGENT,
+        HeaderValue::from_static("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
+    );
+    headers.insert(
+        ACCEPT,
+        HeaderValue::from_static("*/*")
+    );
+    
+    // 创建HTTP客户端
+    let client = reqwest::Client::builder()
+        .default_headers(headers)
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+    
+    // 发送请求
+    let response = client
+        .get("https://app.factory.ai/api/organization/members/chat-usage")
+        .send()
+        .await
+        .map_err(|e| {
+            if e.is_timeout() {
+                "Request timeout after 30 seconds".to_string()
+            } else if e.is_connect() {
+                format!("Connection failed: {}", e)
+            } else {
+                format!("Request failed: {}", e)
+            }
+        })?;
+    
+    // 检查响应状态
+    let status = response.status();
+    if !status.is_success() {
+        let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("API returned error {}: {}", status, error_text));
+    }
+    
+    // 解析JSON响应
+    let json_data = response
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+    
+    Ok(json_data)
+}
+
+/// 批量查询多个 API Key 的余额
+#[tauri::command]
+pub async fn fetch_multiple_droid_balances(api_keys: Vec<String>) -> Result<Vec<serde_json::Value>, String> {
+    use futures::future::join_all;
+    
+    let mut futures = Vec::new();
+    for api_key in api_keys {
+        futures.push(fetch_droid_balance(api_key));
+    }
+    
+    let results = join_all(futures).await;
+    
+    let mut balances = Vec::new();
+    for result in results {
+        match result {
+            Ok(data) => balances.push(data),
+            Err(_) => balances.push(serde_json::json!(null)), // 返回null表示查询失败
+        }
+    }
+    
+    Ok(balances)
+}
+
+/// 根据策略自动切换到下一个 API Key
+#[tauri::command]
+pub async fn auto_switch_droid_key(
+    state: State<'_, AppState>,
+    provider_id: String,
+) -> Result<usize, String> {
+    let mut config = state
+        .config
+        .lock()
+        .map_err(|e| format!("获取锁失败: {}", e))?;
+    
+    if let Some(droid_manager) = &mut config.droid_manager {
+        if let Some(provider) = droid_manager.providers.iter_mut().find(|p| p.id == provider_id) {
+            if let Some(api_keys) = &provider.api_keys {
+                if api_keys.is_empty() {
+                    return Err("没有可用的API Key".to_string());
+                }
+                
+                let current_index = provider.current_key_index.unwrap_or(0);
+                let next_index = match provider.switch_strategy.as_ref().unwrap_or(&crate::droid_config::SwitchStrategy::Manual) {
+                    crate::droid_config::SwitchStrategy::RoundRobin => {
+                        // 轮询策略
+                        (current_index + 1) % api_keys.len()
+                    },
+                    crate::droid_config::SwitchStrategy::UseLowest => {
+                        // 使用余额最低的
+                        let mut min_index = 0;
+                        let mut min_remaining = f64::MAX;
+                        for (i, key) in api_keys.iter().enumerate() {
+                            if let Some(balance) = &key.balance {
+                                if balance.remaining < min_remaining {
+                                    min_remaining = balance.remaining;
+                                    min_index = i;
+                                }
+                            }
+                        }
+                        min_index
+                    },
+                    crate::droid_config::SwitchStrategy::UseHighest => {
+                        // 使用余额最高的
+                        let mut max_index = 0;
+                        let mut max_remaining = 0.0;
+                        for (i, key) in api_keys.iter().enumerate() {
+                            if let Some(balance) = &key.balance {
+                                if balance.remaining > max_remaining {
+                                    max_remaining = balance.remaining;
+                                    max_index = i;
+                                }
+                            }
+                        }
+                        max_index
+                    },
+                    _ => current_index, // Manual模式不自动切换
+                };
+                
+                provider.current_key_index = Some(next_index);
+                provider.api_key = api_keys[next_index].key.clone();
+                
+                drop(config);
+                state.save()?;
+                return Ok(next_index);
+            }
+        }
+    }
+    
+    Err("Provider not found".to_string())
+}
+
+/// 获取 Factory 配置中的自定义模型
+#[tauri::command]
+pub async fn get_factory_custom_models() -> Result<Vec<crate::droid_config::DroidCustomModel>, String> {
+    let config = crate::droid_config::read_factory_config()?;
+    Ok(config.custom_models)
+}
+
+/// 删除 Factory 配置中的自定义模型
+#[tauri::command]
+pub async fn delete_factory_custom_model(model_display_name: String) -> Result<(), String> {
+    let mut config = crate::droid_config::read_factory_config()?;
+    config.custom_models.retain(|m| m.model_display_name != model_display_name);
+    crate::droid_config::write_factory_config(&config)?;
+    Ok(())
+}
+
+/// 更新 Factory 配置中的自定义模型
+#[tauri::command]
+pub async fn update_factory_custom_model(
+    old_display_name: String,
+    model: crate::droid_config::DroidCustomModel
+) -> Result<(), String> {
+    let mut config = crate::droid_config::read_factory_config()?;
+    
+    // 找到并更新模型
+    if let Some(existing) = config.custom_models.iter_mut().find(|m| m.model_display_name == old_display_name) {
+        *existing = model;
+    } else {
+        return Err(format!("Model {} not found", old_display_name));
+    }
+    
+    crate::droid_config::write_factory_config(&config)?;
+    Ok(())
+}

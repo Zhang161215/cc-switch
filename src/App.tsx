@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Provider } from "./types";
+import { Provider, DroidProvider } from "./types";
 import { AppType } from "./lib/tauri-api";
 import ProviderList from "./components/ProviderList";
 import AddProviderModal from "./components/AddProviderModal";
 import EditProviderModal from "./components/EditProviderModal";
+import DroidProviderList from "./components/DroidProviderList";
+import DroidKeyModal from "./components/DroidKeyModal";
+import FactoryModelsList from "./components/FactoryModelsList";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppSwitcher } from "./components/AppSwitcher";
 import SettingsModal from "./components/SettingsModal";
 import { UpdateBadge } from "./components/UpdateBadge";
-import { Plus, Settings, Moon, Sun } from "lucide-react";
+import { Plus, Settings, Moon, Sun, Key } from "lucide-react";
 import McpPanel from "./components/mcp/McpPanel";
 import { buttonStyles } from "./lib/styles";
 import { useDarkMode } from "./hooks/useDarkMode";
@@ -21,10 +24,14 @@ function App() {
   const [activeApp, setActiveApp] = useState<AppType>("claude");
   const [providers, setProviders] = useState<Record<string, Provider>>({});
   const [currentProviderId, setCurrentProviderId] = useState<string>("");
+  const [droidProviders, setDroidProviders] = useState<DroidProvider[]>([]);
+  const [currentDroidProviderId, setCurrentDroidProviderId] = useState<string>("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState<string | null>(
     null,
   );
+  const [editingDroidProvider, setEditingDroidProvider] = useState<DroidProvider | null>(null);
+  const [isDroidKeyModalOpen, setIsDroidKeyModalOpen] = useState(false);
   const [notification, setNotification] = useState<{
     message: string;
     type: "success" | "error";
@@ -117,14 +124,30 @@ function App() {
   }, [activeApp]);
 
   const loadProviders = async () => {
-    const loadedProviders = await window.api.getProviders(activeApp);
-    const currentId = await window.api.getCurrentProvider(activeApp);
-    setProviders(loadedProviders);
-    setCurrentProviderId(currentId);
+    if (activeApp === "droid") {
+      // Droid 模式：加载 Droid 配置
+      await loadDroidProviders();
+    } else {
+      const loadedProviders = await window.api.getProviders(activeApp);
+      const currentId = await window.api.getCurrentProvider(activeApp);
+      setProviders(loadedProviders);
+      setCurrentProviderId(currentId);
 
-    // 如果供应商列表为空，尝试自动从 live 导入一条默认供应商
-    if (Object.keys(loadedProviders).length === 0) {
-      await handleAutoImportDefault();
+      // 如果供应商列表为空，尝试自动从 live 导入一条默认供应商
+      if (Object.keys(loadedProviders).length === 0) {
+        await handleAutoImportDefault();
+      }
+    }
+  };
+
+  const loadDroidProviders = async () => {
+    try {
+      const providers = await window.api.getDroidProviders();
+      const currentId = await window.api.getCurrentDroidProvider();
+      setDroidProviders(providers);
+      setCurrentDroidProviderId(currentId);
+    } catch (error) {
+      console.error("加载 Droid 配置失败:", error);
     }
   };
 
@@ -272,6 +295,77 @@ function App() {
     }
   };
 
+  // Droid 相关处理函数
+  const handleAddDroidProvider = async (provider: DroidProvider) => {
+    try {
+      const newProvider = {
+        ...provider,
+        id: generateId(),
+        createdAt: Date.now(),
+      };
+      await window.api.addDroidProvider(newProvider);
+      await loadDroidProviders();
+      setIsDroidKeyModalOpen(false);
+      showNotification("Droid Key 添加成功", "success", 2000);
+    } catch (error) {
+      console.error("添加 Droid Key 失败:", error);
+      showNotification("添加失败", "error");
+    }
+  };
+
+  const handleEditDroidProvider = (provider: DroidProvider) => {
+    setEditingDroidProvider(provider);
+    setIsDroidKeyModalOpen(true);
+  };
+
+  const handleUpdateDroidProvider = async (provider: DroidProvider) => {
+    try {
+      await window.api.updateDroidProvider(provider);
+      await loadDroidProviders();
+      // 只在有编辑模态框时才关闭
+      if (editingDroidProvider) {
+        setEditingDroidProvider(null);
+        setIsDroidKeyModalOpen(false);
+      }
+      showNotification("Droid Key 更新成功", "success", 2000);
+    } catch (error) {
+      console.error("更新 Droid Key 失败:", error);
+      showNotification("更新失败", "error");
+    }
+  };
+
+  const handleDeleteDroidProvider = async (id: string) => {
+    const provider = droidProviders.find(p => p.id === id);
+    setConfirmDialog({
+      isOpen: true,
+      title: "删除 Droid Key",
+      message: `确定要删除 "${provider?.name}" 吗？`,
+      onConfirm: async () => {
+        try {
+          await window.api.deleteDroidProvider(id);
+          await loadDroidProviders();
+          setConfirmDialog(null);
+          showNotification("Droid Key 已删除", "success");
+        } catch (error) {
+          console.error("删除 Droid Key 失败:", error);
+          showNotification("删除失败", "error");
+        }
+      },
+    });
+  };
+
+  const handleSwitchDroidProvider = async (id: string) => {
+    try {
+      await window.api.switchDroidProvider(id);
+      setCurrentDroidProviderId(id);
+      showNotification("已切换 Droid Key", "success", 2000);
+    } catch (error) {
+      console.error("切换 Droid Key 失败:", error);
+      const detail = extractErrorMessage(error);
+      showNotification(detail || "切换失败", "error");
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
       {/* 顶部导航区域 - 固定高度 */}
@@ -279,13 +373,13 @@ function App() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <a
-              href="https://github.com/farion1231/cc-switch"
+              href="https://github.com/Zhang161215/cc-switch"
               target="_blank"
               rel="noopener noreferrer"
               className="text-xl font-semibold text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
               title={t("header.viewOnGithub")}
             >
-              CC Switch
+              CCD-Switch
             </a>
             <button
               onClick={toggleDarkMode}
@@ -321,11 +415,11 @@ function App() {
             </button>
 
             <button
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => activeApp === "droid" ? setIsDroidKeyModalOpen(true) : setIsAddModalOpen(true)}
               className={`inline-flex items-center gap-2 ${buttonStyles.primary}`}
             >
-              <Plus size={16} />
-              {t("header.addProvider")}
+              {activeApp === "droid" ? <Key size={16} /> : <Plus size={16} />}
+              {activeApp === "droid" ? "添加 Key" : t("header.addProvider")}
             </button>
           </div>
         </div>
@@ -348,14 +442,28 @@ function App() {
               </div>
             )}
 
-            <ProviderList
-              providers={providers}
-              currentProviderId={currentProviderId}
-              onSwitch={handleSwitchProvider}
-              onDelete={handleDeleteProvider}
-              onEdit={setEditingProviderId}
-              onNotify={showNotification}
-            />
+            {activeApp === "droid" ? (
+              <>
+                <DroidProviderList
+                  providers={droidProviders}
+                  currentProviderId={currentDroidProviderId}
+                  onSwitch={handleSwitchDroidProvider}
+                  onEdit={handleEditDroidProvider}
+                  onDelete={handleDeleteDroidProvider}
+                  onUpdate={handleUpdateDroidProvider}
+                />
+                <FactoryModelsList onNotify={showNotification} />
+              </>
+            ) : (
+              <ProviderList
+                providers={providers}
+                currentProviderId={currentProviderId}
+                onSwitch={handleSwitchProvider}
+                onDelete={handleDeleteProvider}
+                onEdit={setEditingProviderId}
+                onNotify={showNotification}
+              />
+            )}
           </div>
         </div>
       </main>
@@ -400,6 +508,17 @@ function App() {
           appType={activeApp}
           onClose={() => setIsMcpOpen(false)}
           onNotify={showNotification}
+        />
+      )}
+
+      {isDroidKeyModalOpen && (
+        <DroidKeyModal
+          provider={editingDroidProvider || undefined}
+          onSubmit={editingDroidProvider ? handleUpdateDroidProvider : handleAddDroidProvider}
+          onClose={() => {
+            setIsDroidKeyModalOpen(false);
+            setEditingDroidProvider(null);
+          }}
         />
       )}
     </div>

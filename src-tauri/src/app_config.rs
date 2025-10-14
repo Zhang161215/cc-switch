@@ -58,6 +58,9 @@ pub struct MultiAppConfig {
     /// MCP 配置（按客户端分治）
     #[serde(default)]
     pub mcp: McpRoot,
+    /// Droid 管理器
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub droid_manager: Option<crate::droid_config::DroidManagerConfig>,
 }
 
 fn default_version() -> u32 {
@@ -74,6 +77,7 @@ impl Default for MultiAppConfig {
             version: 2,
             apps,
             mcp: McpRoot::default(),
+            droid_manager: None,
         }
     }
 }
@@ -105,6 +109,7 @@ impl MultiAppConfig {
                 version: 2,
                 apps,
                 mcp: McpRoot::default(),
+                droid_manager: None,
             };
 
             // 迁移前备份旧版(v1)配置文件
