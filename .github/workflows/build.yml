@@ -2,7 +2,7 @@ name: Release Build
 
 on:
   release:
-    types: [创建]
+    types: [创建] # 注意这里是 created，中文会报错
   workflow_dispatch:
     inputs:
       version:
@@ -29,44 +29,43 @@ jobs:
             bundles: deb,appimage
 
     runs-on: ${{ matrix.os }}
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev librsvg2-dev
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          
+
       - uses: pnpm/action-setup@v2
         with:
           version: 8
-          
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-        
+
       - name: Install dependencies
         run: pnpm install
-        
+
       - name: Build Tauri app
         run: pnpm tauri build --target ${{ matrix.target }}
-        
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
           path: src-tauri/target/*/release/bundle/*/*
-          
-      # 如果是release触发，自动上传到release
+
       - name: Upload to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
