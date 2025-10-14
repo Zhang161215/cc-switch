@@ -230,6 +230,7 @@ pub fn get_current_droid_provider() -> Result<String, String> {
 }
 
 /// Set current Droid provider ID in CC Switch state
+#[allow(dead_code)]
 pub fn set_current_droid_provider(provider_id: &str) -> Result<(), String> {
     let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
     let cc_switch_dir = home_dir.join(".cc-switch");

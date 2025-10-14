@@ -20,8 +20,8 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
   const [selectedPreset, setSelectedPreset] = useState<string>("");
   
   // 检查是否应该显示多key模式
-  const shouldShowMultiKey = provider && provider.api_keys && provider.api_keys.length > 0;
-  const [showMultiKey, setShowMultiKey] = useState(shouldShowMultiKey || false);
+  const initialShowMultiKey = provider && provider.api_keys && provider.api_keys.length > 0;
+  const [showMultiKey, setShowMultiKey] = useState(initialShowMultiKey || false);
   
   const [formData, setFormData] = useState<DroidProvider>(
     provider || {
@@ -129,13 +129,33 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
       
       // 批量查询余额
       const balances = await window.api.fetchMultipleDroidBalances(apiKeys);
+      console.log('Fetched balances:', balances);
       
       // 更新每个Key的余额信息
       const updatedKeys = formData.api_keys.map((key, index) => {
         const balanceData = balances[index];
         if (balanceData && balanceData !== null) {
-          const totalAllowance = balanceData.totalAllowance || 0;
-          const totalUsed = balanceData.totalUsed || 0;
+          // 从Factory API获取的数据结构中提取信息
+          let totalAllowance = 20000000; // 默认20M tokens
+          let totalUsed = 0;
+          
+          // 正确的数据路径是 data.usage.standard
+          if (balanceData.usage && balanceData.usage.standard) {
+            totalAllowance = balanceData.usage.standard.totalAllowance || 20000000;
+            totalUsed = balanceData.usage.standard.orgTotalTokensUsed || 0;
+          } else {
+            // 备用字段
+            totalAllowance = 
+              balanceData.max_tokens_per_day || 
+              balanceData.totalAllowance || 
+              balanceData.quotas?.tokens_per_day ||
+              20000000;
+            totalUsed = 
+              balanceData.tokens_used_today || 
+              balanceData.totalUsed || 
+              balanceData.usage?.tokens_today ||
+              0;
+          }
           const remaining = totalAllowance - totalUsed;
           const usedRatio = totalAllowance > 0 ? totalUsed / totalAllowance : 0;
           
@@ -146,6 +166,18 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
               totalUsed,
               remaining,
               usedRatio,
+              last_checked: Date.now()
+            }
+          };
+        } else {
+          // 如果没有获取到数据，提供默认值
+          return {
+            ...key,
+            balance: {
+              totalAllowance: 20000000, // 默认20M tokens
+              totalUsed: 0,
+              remaining: 20000000,
+              usedRatio: 0,
               last_checked: Date.now()
             }
           };
@@ -260,23 +292,11 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      if (!showMultiKey && !formData.api_keys?.length && formData.api_key) {
-                        // 切换到多Key模式时，将单个key转为api_keys数组
-                        setFormData({
-                          ...formData,
-                          api_keys: [{
-                            id: "1",
-                            key: formData.api_key,
-                            name: "主Key",
-                            is_active: true
-                          }]
-                        });
-                      }
+                      // 简单切换显示模式，不限制
                       setShowMultiKey(!showMultiKey);
                     }}
                     className="text-xs px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
-                    disabled={showMultiKey && formData.api_keys && formData.api_keys.length > 1}
-                    title={showMultiKey && formData.api_keys && formData.api_keys.length > 1 ? "有多个Key时不能切换到单Key模式" : ""}
+                    title="点击切换管理模式"
                   >
                     {showMultiKey ? "切换到单Key" : "切换到多Key"}
                   </button>

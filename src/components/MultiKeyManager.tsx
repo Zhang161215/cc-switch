@@ -52,6 +52,7 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
 
   // 格式化数字显示
   const formatNumber = (num: number): string => {
+    if (!num || num === 0) return "0";
     if (num >= 1000000) return `${(num / 1000000).toFixed(0)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(0)}K`;
     return num.toString();
@@ -101,54 +102,6 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 汇总信息卡片 */}
-      <div className={cn(cardStyles.base, "bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-900/20 dark:to-purple-900/20")}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            API Keys 汇总
-          </h3>
-          <button
-            onClick={handleRefreshAll}
-            disabled={refreshing}
-            className={buttonStyles.icon}
-            title="刷新所有余额"
-          >
-            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-4 gap-4">
-          <div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Keys 数量</div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {apiKeys.length}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">总额度</div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {formatNumber(totalBalance.totalAllowance)}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">总剩余</div>
-            <div className={cn(
-              "text-2xl font-bold",
-              totalBalance.remaining === 0 
-                ? "text-red-500 dark:text-red-400"
-                : "text-green-600 dark:text-green-400"
-            )}>
-              {formatNumber(totalBalance.remaining)}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">平均使用率</div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {formatPercentage(averageUsageRatio)}
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* 切换策略选择 */}
       <div className={cardStyles.base}>
@@ -187,18 +140,30 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
           <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
             API Keys ({apiKeys.length})
           </h4>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowAddModal(true);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 rounded-lg transition-colors"
-          >
-            <Plus size={14} />
-            添加 Key
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRefreshAll}
+              disabled={refreshing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
+              title="刷新所有余额"
+            >
+              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+              刷新余额
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowAddModal(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 rounded-lg transition-colors"
+            >
+              <Plus size={14} />
+              添加 Key
+            </button>
+          </div>
         </div>
 
         {apiKeys.map((key, index) => {
@@ -242,33 +207,42 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                       </span>
                     </div>
 
-                    {key.balance && (
-                      <div className="flex items-center gap-4 mt-2">
-                        <div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">额度:</span>
-                          <span className="ml-1 font-medium text-gray-900 dark:text-gray-100">
-                            {formatNumber(key.balance.totalAllowance)}
-                          </span>
+                    {(() => {
+                      // 使用默认值如果没有余额信息
+                      const balance = key.balance || {
+                        totalAllowance: 20000000,  // 默认20M
+                        remaining: 20000000,
+                        totalUsed: 0,
+                        usedRatio: 0
+                      };
+                      return (
+                        <div className="flex items-center gap-4 mt-2">
+                          <div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">额度:</span>
+                            <span className="ml-1 font-medium text-gray-900 dark:text-gray-100">
+                              {formatNumber(balance.totalAllowance)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">剩余:</span>
+                            <span className={cn(
+                              "ml-1 font-medium",
+                              balance.remaining === 0 
+                                ? "text-red-500" 
+                                : "text-green-600 dark:text-green-400"
+                            )}>
+                              {formatNumber(balance.remaining)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">使用率:</span>
+                            <span className="ml-1 font-medium text-gray-900 dark:text-gray-100">
+                              {formatPercentage(balance.usedRatio)}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">剩余:</span>
-                          <span className={cn(
-                            "ml-1 font-medium",
-                            key.balance.remaining === 0 
-                              ? "text-red-500" 
-                              : "text-green-600 dark:text-green-400"
-                          )}>
-                            {formatNumber(key.balance.remaining)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">使用率:</span>
-                          <span className="ml-1 font-medium text-gray-900 dark:text-gray-100">
-                            {formatPercentage(key.balance.usedRatio)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
 
