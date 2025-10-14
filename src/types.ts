@@ -126,11 +126,11 @@ export interface ApiKeyInfo {
   is_active: boolean; // 当前是否在使用
   last_used?: number; // 最后使用时间
   balance?: {
-    totalAllowance: number;
-    totalUsed: number;
+    total_allowance: number;
+    total_used: number;
     remaining: number;
-    usedRatio: number;
-    lastChecked?: number;
+    used_ratio: number;
+    last_checked?: number;
   };
 }
 

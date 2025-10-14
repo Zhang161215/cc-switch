@@ -318,19 +318,29 @@ function App() {
     setIsDroidKeyModalOpen(true);
   };
 
-  const handleUpdateDroidProvider = async (provider: DroidProvider) => {
+  const handleUpdateDroidProvider = async (provider: DroidProvider, silent = false) => {
     try {
+      console.log("[Frontend] Updating provider:", provider);
       await window.api.updateDroidProvider(provider);
       await loadDroidProviders();
       // 只在有编辑模态框时才关闭
       if (editingDroidProvider) {
         setEditingDroidProvider(null);
         setIsDroidKeyModalOpen(false);
+        showNotification("Droid Key 更新成功", "success", 2000);
+      } else if (!silent) {
+        // 如果不是静默模式且不是编辑框触发的，才显示通知（比如手动切换模型）
+        showNotification("配置已更新", "success", 1000);
       }
-      showNotification("Droid Key 更新成功", "success", 2000);
+      // 如果是静默模式（比如自动刷新余额），不显示任何通知
     } catch (error) {
-      console.error("更新 Droid Key 失败:", error);
-      showNotification("更新失败", "error");
+      console.error("更新 Droid Key 失败 - 详细错误:", error);
+      console.error("错误类型:", typeof error);
+      console.error("错误消息:", (error as any)?.message || error);
+      if (!silent) {
+        const errorMsg = (error as any)?.message || String(error) || "更新失败";
+        showNotification(errorMsg, "error");
+      }
     }
   };
 
@@ -451,6 +461,7 @@ function App() {
                   onEdit={handleEditDroidProvider}
                   onDelete={handleDeleteDroidProvider}
                   onUpdate={handleUpdateDroidProvider}
+                  onNotify={showNotification}
                 />
                 <FactoryModelsList onNotify={showNotification} />
               </>
@@ -514,7 +525,9 @@ function App() {
       {isDroidKeyModalOpen && (
         <DroidKeyModal
           provider={editingDroidProvider || undefined}
-          onSubmit={editingDroidProvider ? handleUpdateDroidProvider : handleAddDroidProvider}
+          onSubmit={editingDroidProvider 
+            ? (provider) => handleUpdateDroidProvider(provider, false) 
+            : handleAddDroidProvider}
           onClose={() => {
             setIsDroidKeyModalOpen(false);
             setEditingDroidProvider(null);

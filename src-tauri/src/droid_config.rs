@@ -287,8 +287,9 @@ pub fn apply_provider_to_factory(provider: &DroidProvider) -> Result<(), String>
         supports_prompt_caching: provider.supports_prompt_caching,
     };
     
-    // Remove all existing [droid] models first (to avoid duplicates)
-    config.custom_models.retain(|m| !m.model_display_name.ends_with(" [droid]"));
+    // Remove all existing droid models first (to avoid duplicates)
+    // 检查是否包含 [droid] 或 [D]
+    config.custom_models.retain(|m| !m.model_display_name.contains("[droid]") && !m.model_display_name.contains("[D]"));
     
     // Add the new model
     config.custom_models.push(custom_model);

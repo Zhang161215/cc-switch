@@ -10,6 +10,7 @@ interface DroidProviderListProps {
   onEdit: (provider: DroidProvider) => void;
   onDelete: (id: string) => void;
   onUpdate?: (provider: DroidProvider) => void;
+  onNotify?: (message: string, type: "success" | "error") => void;
 }
 
 interface BalanceInfo {
@@ -28,16 +29,48 @@ const DroidProviderList: React.FC<DroidProviderListProps> = ({
   onEdit,
   onDelete,
   onUpdate,
+  onNotify,
 }) => {
   const [balances, setBalances] = useState<Record<string, BalanceInfo>>({});
   const [refreshing, setRefreshing] = useState<Record<string, boolean>>({});
   const [showModelSelect, setShowModelSelect] = useState<Record<string, boolean>>({});
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   
-  // 可选的模型列表
-  const availableModels = [
-    { value: "claude-sonnet-4-5-20250929", label: "Sonnet 4.5 [droid]" },
-    { value: "claude-opus-4-1-20250805", label: "Opus 4.1 [droid]" }
-  ];
+  // 可选的模型列表 - 动态添加余额信息
+  const getAvailableModels = (providerId: string) => {
+    const balance = balances[providerId];
+    const models = [
+      { value: "claude-sonnet-4-5-20250929", label: "Sonnet 4.5" },
+      { value: "claude-opus-4-1-20250805", label: "Opus 4.1" }
+    ];
+    
+    // 如果有余额信息，添加到显示名称中
+    if (balance && !balance.loading) {
+      if (balance.remaining <= 0) {
+        return models.map(model => ({
+          ...model,
+          displayLabel: `${model.label} [D] ⚠️ 额度耗尽`
+        }));
+      } else {
+        const remainingM = (balance.remaining / 1000000).toFixed(1);
+        // 选择红黄绿圆形图标
+        let indicator = "🟢";
+        if (balance.usedRatio < 0.5) {
+          indicator = "🟢"; // 绿色
+        } else if (balance.usedRatio < 0.8) {
+          indicator = "🟡"; // 黄色
+        } else {
+          indicator = "🔴"; // 红色
+        }
+        return models.map(model => ({
+          ...model,
+          displayLabel: `${model.label} [D] ${indicator} ${remainingM}M`
+        }));
+      }
+    }
+    
+    return models.map(model => ({ ...model, displayLabel: model.label }));
+  };
 
   // 格式化数字显示
   const formatNumber = (num: number): string => {
@@ -50,7 +83,7 @@ const DroidProviderList: React.FC<DroidProviderListProps> = ({
   };
 
   // 获取余额信息
-  const fetchBalance = async (provider: DroidProvider) => {
+  const fetchBalance = async (provider: DroidProvider, checkAutoSwitch: boolean = true) => {
     if (!provider.api_key && (!provider.api_keys || provider.api_keys.length === 0)) return;
 
     console.log(`Fetching balance for provider ${provider.name}...`);
@@ -63,6 +96,7 @@ const DroidProviderList: React.FC<DroidProviderListProps> = ({
     try {
       let totalAllowance = 0;
       let totalUsed = 0;
+      let currentKeyExhausted = false;
       
       // 检查是否有多个keys
       if (provider.api_keys && provider.api_keys.length > 0) {
@@ -70,6 +104,23 @@ const DroidProviderList: React.FC<DroidProviderListProps> = ({
         const apiKeys = provider.api_keys.map(k => k.key);
         const balancesData = await window.api.fetchMultipleDroidBalances(apiKeys);
         console.log('Multiple balance data received:', balancesData);
+        
+        // 检查当前key是否已耗尽
+        const currentKeyIndex = provider.current_key_index || 0;
+        if (balancesData[currentKeyIndex]) {
+          const currentKeyData = balancesData[currentKeyIndex];
+          if (currentKeyData?.usage?.standard) {
+            const keyAllowance = currentKeyData.usage.standard.totalAllowance || 0;
+            const keyUsed = currentKeyData.usage.standard.orgTotalTokensUsed || 0;
+            const keyRemaining = Math.max(0, keyAllowance - keyUsed);
+            
+            // 如果当前key余额为0或使用率超过99%，标记为已耗尽
+            if (keyRemaining === 0 || (keyAllowance > 0 && keyUsed / keyAllowance > 0.99)) {
+              currentKeyExhausted = true;
+              console.log(`Current key ${currentKeyIndex} is exhausted. Remaining: ${keyRemaining}, Ratio: ${keyUsed / keyAllowance}`);
+            }
+          }
+        }
         
         // 汇总所有keys的余额
         balancesData.forEach((data, index) => {
@@ -87,6 +138,13 @@ const DroidProviderList: React.FC<DroidProviderListProps> = ({
         if (data.usage && data.usage.standard) {
           totalAllowance = data.usage.standard.totalAllowance || 0;
           totalUsed = data.usage.standard.orgTotalTokensUsed || 0;
+          
+          // 单key模式下也检查是否耗尽
+          const remaining = Math.max(0, totalAllowance - totalUsed);
+          if (remaining === 0 || (totalAllowance > 0 && totalUsed / totalAllowance > 0.99)) {
+            currentKeyExhausted = true;
+            console.log(`Single key is exhausted. Remaining: ${remaining}`);
+          }
         }
       }
       
@@ -103,6 +161,137 @@ const DroidProviderList: React.FC<DroidProviderListProps> = ({
           loading: false,
         }
       }));
+      
+      // 如果是当前使用的provider，更新Factory配置中的显示名称
+      if (provider.id === currentProviderId) {
+        const baseModelName = provider.model === "claude-opus-4-1-20250805" 
+          ? "Opus 4.1" 
+          : "Sonnet 4.5";
+        
+        let newDisplayName: string;
+        if (remaining <= 0) {
+          // 所有key都耗尽了，显示警告
+          newDisplayName = `${baseModelName} [D] ⚠️ 额度耗尽`;
+        } else {
+          // 有余额，显示余额信息
+          const remainingM = (remaining / 1000000).toFixed(1);
+          // 根据余额比例选择红黄绿圆形图标
+          let indicator = "🟢"; // 默认绿色
+          if (usedRatio < 0.5) {
+            indicator = "🟢"; // 绿色：充足（使用率<50%）
+          } else if (usedRatio < 0.8) {
+            indicator = "🟡"; // 黄色：适中（使用率50-80%）
+          } else {
+            indicator = "🔴"; // 红色：偏低（使用率>80%）
+          }
+          newDisplayName = `${baseModelName} [D] ${indicator} ${remainingM}M`;
+        }
+        
+        // 如果显示名称发生变化，更新provider
+        if (provider.model_display_name !== newDisplayName) {
+          const updatedProvider: DroidProvider = {
+            ...provider,
+            model_display_name: newDisplayName
+          };
+          
+          // 调用onUpdate更新，这会自动更新.factory/config.json
+          // 使用静默模式，不显示通知
+          if (onUpdate) {
+            (onUpdate as any)(updatedProvider, true);
+          }
+        }
+      }
+      
+      // 如果当前key已耗尽且是当前使用的provider，尝试自动切换
+      if (checkAutoSwitch && currentKeyExhausted && provider.id === currentProviderId) {
+        console.log(`Current key exhausted for provider ${provider.name}`);
+        
+        // 根据切换策略进行切换
+        const strategy = provider.switch_strategy || 'manual';
+        
+        if (strategy !== 'manual' && provider.api_keys && provider.api_keys.length > 1) {
+          console.log(`Auto-switching with strategy: ${strategy}`);
+          
+          // 根据策略选择下一个key
+          let newIndex = -1;
+          const currentIndex = provider.current_key_index || 0;
+          
+          if (strategy === 'round_robin') {
+            // 轮询：切换到下一个有余额的key
+            for (let i = 1; i <= provider.api_keys.length; i++) {
+              const idx = (currentIndex + i) % provider.api_keys.length;
+              const keyInfo = provider.api_keys[idx];
+              // 检查该key是否有余额（如果没有balance信息则认为有余额）
+              if (!keyInfo.balance || keyInfo.balance.remaining > 0) {
+                newIndex = idx;
+                break;
+              }
+            }
+          } else if (strategy === 'use_lowest') {
+            // 使用最低余额的（但大于0）
+            let lowestBalance = Infinity;
+            provider.api_keys.forEach((key, idx) => {
+              const balance = key.balance?.remaining || Infinity;
+              if (balance > 0 && balance < lowestBalance) {
+                lowestBalance = balance;
+                newIndex = idx;
+              }
+            });
+          } else if (strategy === 'use_highest') {
+            // 使用最高余额的
+            let highestBalance = 0;
+            provider.api_keys.forEach((key, idx) => {
+              const balance = key.balance?.remaining || 0;
+              if (balance > highestBalance) {
+                highestBalance = balance;
+                newIndex = idx;
+              }
+            });
+          }
+          
+          // 如果找到可用的key，进行切换
+          if (newIndex >= 0 && newIndex !== currentIndex) {
+            try {
+              console.log(`Switching to key index ${newIndex}`);
+              
+              // 更新provider配置
+              const updatedProvider = {
+                ...provider,
+                current_key_index: newIndex,
+                api_key: provider.api_keys[newIndex].key
+              };
+              
+              // 调用更新函数
+              if (onUpdate) {
+                (onUpdate as any)(updatedProvider, true); // 静默更新
+              }
+              
+              // 通知用户
+              const message = `余额耗尽，已自动切换到 ${provider.api_keys[newIndex].name || `Key ${newIndex + 1}`}`;
+              if (onNotify) {
+                onNotify(message, "success");
+              }
+              
+              // 重新获取余额（不再检查自动切换，避免循环）
+              setTimeout(() => {
+                fetchBalance(provider, false);
+              }, 1000);
+            } catch (error) {
+              console.error('Failed to auto-switch key:', error);
+            }
+          } else if (strategy !== 'manual') {
+            // 所有key都耗尽了
+            if (onNotify) {
+              onNotify("所有API Key余额都已耗尽，请添加新的Key", "error");
+            }
+          }
+        } else if (strategy === 'manual') {
+          // 手动模式下只提醒用户
+          if (onNotify) {
+            onNotify("当前API Key余额已耗尽，请手动切换或添加新的Key", "error");
+          }
+        }
+      }
     } catch (error) {
       console.error(`Failed to fetch balance for ${provider.name}:`, error);
       let errorMessage = 'Unknown error';
@@ -134,14 +323,38 @@ const DroidProviderList: React.FC<DroidProviderListProps> = ({
 
   // 处理模型切换
   const handleModelChange = async (provider: DroidProvider, newModel: string) => {
-    const modelInfo = availableModels.find(m => m.value === newModel);
+    const models = getAvailableModels(provider.id);
+    const modelInfo = models.find(m => m.value === newModel);
     if (!modelInfo) return;
+    
+    // 获取余额信息来构建显示名称
+    const balance = balances[provider.id];
+    let displayName = modelInfo.label;
+    
+    if (balance && !balance.loading) {
+      if (balance.remaining <= 0) {
+        // 余额耗尽
+        displayName = `${modelInfo.label} [D] ⚠️ 额度耗尽`;
+      } else {
+        const remainingM = (balance.remaining / 1000000).toFixed(1);
+        // 根据使用率选择红黄绿圆形图标
+        let indicator = "🟢";
+        if (balance.usedRatio < 0.5) {
+          indicator = "🟢"; // 绿色
+        } else if (balance.usedRatio < 0.8) {
+          indicator = "🟡"; // 黄色
+        } else {
+          indicator = "🔴"; // 红色
+        }
+        displayName = `${modelInfo.label} [D] ${indicator} ${remainingM}M`;
+      }
+    }
     
     // 更新provider的模型
     const updatedProvider: DroidProvider = {
       ...provider,
       model: newModel,
-      model_display_name: modelInfo.label
+      model_display_name: displayName
     };
     
     // 关闭下拉框
@@ -161,6 +374,30 @@ const DroidProviderList: React.FC<DroidProviderListProps> = ({
       }
     });
   }, [providers]);
+
+  // 自动刷新余额（每10秒）
+  useEffect(() => {
+    if (autoRefreshEnabled && providers.length > 0) {
+      // 立即执行一次检查
+      providers.forEach(provider => {
+        if (provider.id === currentProviderId && (provider.api_key || (provider.api_keys && provider.api_keys.length > 0))) {
+          fetchBalance(provider);
+        }
+      });
+      
+      // 设置定时器
+      const interval = setInterval(() => {
+        console.log('自动检测余额状态...');
+        // 只检查当前使用的provider，减少API调用
+        const currentProvider = providers.find(p => p.id === currentProviderId);
+        if (currentProvider && (currentProvider.api_key || (currentProvider.api_keys && currentProvider.api_keys.length > 0))) {
+          fetchBalance(currentProvider);
+        }
+      }, 10000); // 10秒刷新一次
+
+      return () => clearInterval(interval);
+    }
+  }, [providers, autoRefreshEnabled, currentProviderId, onUpdate]);
   
   // 点击外部关闭下拉框
   useEffect(() => {
@@ -238,7 +475,9 @@ const DroidProviderList: React.FC<DroidProviderListProps> = ({
                         }}
                         className="flex items-center gap-1.5 px-2 py-1 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                       >
-                        <span>{provider.model_display_name || "Sonnet 4.5 [droid]"}</span>
+                        <span>
+                          {provider.model_display_name || "Sonnet 4.5 [droid]"}
+                        </span>
                         <ChevronDown size={14} className={cn(
                           "transition-transform",
                           showModelSelect[provider.id] ? "rotate-180" : ""
@@ -246,8 +485,8 @@ const DroidProviderList: React.FC<DroidProviderListProps> = ({
                       </button>
                       
                       {showModelSelect[provider.id] && (
-                        <div className="absolute top-full left-0 mt-1 w-full min-w-[220px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10 overflow-hidden">
-                          {availableModels.map((model) => {
+                        <div className="absolute top-full left-0 mt-1 w-full min-w-[280px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10 overflow-hidden">
+                          {getAvailableModels(provider.id).map((model) => {
                             const isSelected = provider.model === model.value || 
                                              (!provider.model && model.value === "claude-sonnet-4-5-20250929");
                             return (
@@ -259,7 +498,7 @@ const DroidProviderList: React.FC<DroidProviderListProps> = ({
                                   isSelected && "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
                                 )}
                               >
-                                {model.label}
+                                {model.displayLabel}
                                 {isSelected && <span className="ml-2 text-xs">✓</span>}
                               </button>
                             );

@@ -67,6 +67,10 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log("[DroidKeyModal] Submitting formData:", formData);
+    console.log("[DroidKeyModal] Is editing:", !!provider);
+    console.log("[DroidKeyModal] FormData ID:", formData.id);
+    
     // 如果使用多Key模式，确保至少有一个key
     if (showMultiKey) {
       if (formData.name && formData.api_keys && formData.api_keys.length > 0) {
@@ -75,6 +79,7 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
           ...formData,
           api_key: formData.api_keys[formData.current_key_index || 0]?.key || ""
         };
+        console.log("[DroidKeyModal] Submitting multi-key data:", finalData);
         onSubmit(finalData);
       }
     } else {
@@ -92,6 +97,7 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
           current_key_index: 0,
           switch_strategy: "manual" as SwitchStrategy
         };
+        console.log("[DroidKeyModal] Submitting single-key data:", finalData);
         onSubmit(finalData);
       }
     }
@@ -162,10 +168,10 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
           return {
             ...key,
             balance: {
-              totalAllowance,
-              totalUsed,
+              total_allowance: totalAllowance,
+              total_used: totalUsed,
               remaining,
-              usedRatio,
+              used_ratio: usedRatio,
               last_checked: Date.now()
             }
           };
@@ -174,10 +180,10 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
           return {
             ...key,
             balance: {
-              totalAllowance: 20000000, // 默认20M tokens
-              totalUsed: 0,
+              total_allowance: 20000000, // 默认20M tokens
+              total_used: 0,
               remaining: 20000000,
-              usedRatio: 0,
+              used_ratio: 0,
               last_checked: Date.now()
             }
           };

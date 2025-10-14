@@ -41,13 +41,13 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
 
   // 计算汇总信息
   const totalBalance = apiKeys.reduce((acc, key) => ({
-    totalAllowance: acc.totalAllowance + (key.balance?.totalAllowance || 0),
-    totalUsed: acc.totalUsed + (key.balance?.totalUsed || 0),
+    totalAllowance: acc.totalAllowance + (key.balance?.total_allowance || 0),
+    totalUsed: acc.totalUsed + (key.balance?.total_used || 0),
     remaining: acc.remaining + (key.balance?.remaining || 0),
   }), { totalAllowance: 0, totalUsed: 0, remaining: 0 });
 
   const averageUsageRatio = apiKeys.length > 0 
-    ? apiKeys.reduce((acc, key) => acc + (key.balance?.usedRatio || 0), 0) / apiKeys.length
+    ? apiKeys.reduce((acc, key) => acc + (key.balance?.used_ratio || 0), 0) / apiKeys.length
     : 0;
 
   // 格式化数字显示
@@ -74,15 +74,25 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
   // 添加新Key
   const handleAddKey = () => {
     if (newKeyData.key) {
+      // 清除API key前后的空格
+      const trimmedKey = newKeyData.key.trim();
+      
       const newKey: ApiKeyInfo = {
         id: Date.now().toString(),
-        key: newKeyData.key,
+        key: trimmedKey,
         name: newKeyData.name || `Key ${apiKeys.length + 1}`,
         is_active: apiKeys.length === 0,
       };
       onAddKey(newKey);
       setNewKeyData({ name: "", key: "" });
       setShowAddModal(false);
+      
+      // 添加后立即触发余额刷新
+      setTimeout(() => {
+        if (onRefreshBalances) {
+          onRefreshBalances();
+        }
+      }, 500);
     }
   };
 
@@ -173,7 +183,8 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
               key={key.id}
               className={cn(
                 cardStyles.interactive,
-                isActive && "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900"
+                isActive && "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900",
+                key.balance && key.balance.remaining <= 0 && "border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/20"
               )}
             >
               <div className="flex items-center justify-between">
@@ -197,6 +208,11 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                         使用中
                       </span>
                     )}
+                    {key.balance && key.balance.remaining <= 0 && (
+                      <span className="text-xs px-2 py-0.5 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded">
+                        ⚠️ 余额耗尽
+                      </span>
+                    )}
                   </div>
 
                   <div className="space-y-1 text-sm">
@@ -210,17 +226,17 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                     {(() => {
                       // 使用默认值如果没有余额信息
                       const balance = key.balance || {
-                        totalAllowance: 20000000,  // 默认20M
+                        total_allowance: 20000000,  // 默认20M
                         remaining: 20000000,
-                        totalUsed: 0,
-                        usedRatio: 0
+                        total_used: 0,
+                        used_ratio: 0
                       };
                       return (
                         <div className="flex items-center gap-4 mt-2">
                           <div>
                             <span className="text-xs text-gray-500 dark:text-gray-400">额度:</span>
                             <span className="ml-1 font-medium text-gray-900 dark:text-gray-100">
-                              {formatNumber(balance.totalAllowance)}
+                              {formatNumber(balance.total_allowance)}
                             </span>
                           </div>
                           <div>
@@ -237,7 +253,7 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                           <div>
                             <span className="text-xs text-gray-500 dark:text-gray-400">使用率:</span>
                             <span className="ml-1 font-medium text-gray-900 dark:text-gray-100">
-                              {formatPercentage(balance.usedRatio)}
+                              {formatPercentage(balance.used_ratio)}
                             </span>
                           </div>
                         </div>
@@ -249,10 +265,34 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                 <div className="flex items-center gap-2">
                   {switchStrategy === 'manual' && !isActive && (
                     <button
-                      onClick={() => onSelectKey(index)}
-                      className={cn(buttonStyles.secondary, "text-sm py-1 px-2")}
+                      onClick={() => {
+                        // 检查当前key余额
+                        const balance = key.balance;
+                        if (balance && balance.remaining <= 0) {
+                          // 查找第一个有余额的key
+                          const availableKeyIndex = apiKeys.findIndex((k, i) => 
+                            i !== index && (!k.balance || k.balance.remaining > 0)
+                          );
+                          
+                          if (availableKeyIndex !== -1) {
+                            onSelectKey(availableKeyIndex);
+                            alert(`Key "${key.name}" 余额不足，已自动切换到 "${apiKeys[availableKeyIndex].name}"`);
+                          } else {
+                            alert('所有Key余额都已耗尽，请添加新的API Key');
+                          }
+                        } else {
+                          onSelectKey(index);
+                        }
+                      }}
+                      disabled={key.balance && key.balance.remaining <= 0}
+                      className={cn(
+                        "text-sm py-1 px-2",
+                        key.balance && key.balance.remaining <= 0
+                          ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                          : buttonStyles.secondary
+                      )}
                     >
-                      切换
+                      {key.balance && key.balance.remaining <= 0 ? "余额不足" : "切换"}
                     </button>
                   )}
                   <button

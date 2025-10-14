@@ -1374,40 +1374,68 @@ pub async fn update_droid_provider(
     state: State<'_, AppState>,
     provider: crate::droid_config::DroidProvider,
 ) -> Result<(), String> {
+    println!("[DEBUG] update_droid_provider called with provider id: {}, name: {}", provider.id, provider.name);
+    
     let mut config = state
         .config
         .lock()
         .map_err(|e| format!("获取锁失败: {}", e))?;
     
     if let Some(droid_manager) = &mut config.droid_manager {
+        println!("[DEBUG] Found droid_manager with {} providers", droid_manager.providers.len());
+        
         if let Some(existing) = droid_manager.providers.iter_mut().find(|p| p.id == provider.id) {
+            println!("[DEBUG] Found existing provider with id: {}", provider.id);
+            
             // 保存旧的model_display_name用于查找和删除旧配置
             let old_model_display_name = existing.model_display_name.clone();
+            println!("[DEBUG] Old model_display_name: {:?}", old_model_display_name);
+            println!("[DEBUG] New model_display_name: {:?}", provider.model_display_name);
             
             // 更新provider
             *existing = provider.clone();
             
             // 如果是当前provider，更新到 Factory 配置
             if droid_manager.current == provider.id {
+                println!("[DEBUG] This is the current provider, updating Factory config");
                 drop(config);
                 
                 // 先删除旧的配置（如果model_display_name改变了）
                 if old_model_display_name != provider.model_display_name {
-                    crate::droid_config::remove_old_factory_model(&old_model_display_name)?;
+                    println!("[DEBUG] model_display_name changed, removing old config");
+                    if let Err(e) = crate::droid_config::remove_old_factory_model(&old_model_display_name) {
+                        println!("[ERROR] Failed to remove old factory model: {}", e);
+                        return Err(format!("删除旧配置失败: {}", e));
+                    }
                 }
                 
                 // 应用新配置
-                crate::droid_config::apply_provider_to_factory(&provider)?;
-                return state.save();
+                println!("[DEBUG] Applying provider to Factory config");
+                if let Err(e) = crate::droid_config::apply_provider_to_factory(&provider) {
+                    println!("[ERROR] Failed to apply provider to factory: {}", e);
+                    return Err(format!("应用配置到 Factory 失败: {}", e));
+                }
+                
+                println!("[DEBUG] Saving state");
+                if let Err(e) = state.save() {
+                    println!("[ERROR] Failed to save state: {}", e);
+                    return Err(format!("保存状态失败: {}", e));
+                }
+                
+                println!("[DEBUG] Update completed successfully");
+                return Ok(());
             }
         } else {
+            println!("[ERROR] Provider {} not found", provider.id);
             return Err(format!("Provider {} 不存在", provider.id));
         }
     } else {
+        println!("[ERROR] Droid manager not initialized");
         return Err("Droid manager 未初始化".to_string());
     }
     
     drop(config);
+    println!("[DEBUG] Saving state (non-current provider)");
     state.save()?;
     Ok(())
 }
