@@ -1,0 +1,47 @@
+name: Build Windows Version
+
+     on:
+       workflow_dispatch:
+
+     jobs:
+       build-windows:
+         runs-on: windows-latest
+
+         steps:
+           - uses: actions/checkout@v4
+
+           - name: Setup Node.js
+             uses: actions/setup-node@v4
+             with:
+               node-version: 18
+
+           - uses: pnpm/action-setup@v2
+             with:
+               version: 8
+
+           - name: Install Rust
+             uses: dtolnay/rust-toolchain@stable
+
+           - name: Install dependencies
+             run: pnpm install
+
+           - name: Build Tauri app
+             run: pnpm tauri build
+
+           - name: List build outputs
+             run: |
+               dir src-tauri\target\release\
+               dir src-tauri\target\release\bundle\msi\
+             shell: cmd
+
+           - name: Upload exe file
+             uses: actions/upload-artifact@v4
+             with:
+               name: ccd-switch-exe
+               path: src-tauri/target/release/cc-switch.exe
+
+           - name: Upload MSI installer
+             uses: actions/upload-artifact@v4
+             with:
+               name: ccd-switch-installer
+               path: src-tauri/target/release/bundle/msi/*.msi
