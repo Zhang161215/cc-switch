@@ -1,7 +1,7 @@
 name: Build Windows Version
 
 on: workflow_dispatch:
-
+ 
 jobs:
        build-windows:
          runs-on: windows-latest
