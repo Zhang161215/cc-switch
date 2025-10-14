@@ -44,9 +44,5 @@
       }
     }
   },
-"plugins": {
-  "updater": {
-    "active": true
-  }
-}
+  "plugins": {}
 }
