@@ -46,6 +46,10 @@
 
 ![主界面](screenshots/main.png)
 
+### Droid多Key管理
+
+![Droid多Key管理](screenshots/droid-management.png)
+
 ### 添加供应商
 
 ![添加供应商](screenshots/add.png)
