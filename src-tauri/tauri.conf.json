@@ -45,12 +45,7 @@
       "wix": {
         "template": "wix/per-user-main.wxs"
       },
-      "nsis": {
-        "license": "../LICENSE",
-        "installerIcon": "icons/icon.ico",
-        "installMode": "currentUser",
-        "languages": ["SimpChinese", "English"]
-      }
+      "nsis": null
     }
   },
   "plugins": {}
