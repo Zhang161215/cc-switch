@@ -1,0 +1,18 @@
+{
+  "name": "droid2api",
+  "version": "1.3.4",
+  "description": "OpenAI Compatible API Proxy",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["openai", "api", "proxy"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2"
+  }
+}

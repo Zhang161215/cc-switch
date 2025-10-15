@@ -5,6 +5,7 @@ mod codex_config;
 mod commands;
 mod config;
 mod droid_config;
+mod droid2api_service;
 mod import_export;
 mod mcp;
 mod migration;
@@ -359,6 +360,9 @@ pub fn run() {
 
             // 初始化应用状态（仅创建一次，并在本函数末尾注入 manage）
             let app_state = AppState::new();
+            
+            // 初始化droid2api服务管理
+            let droid2api_service = droid2api_service::Droid2ApiService::new();
 
             // 首次启动迁移：扫描副本文件，合并到 config.json，并归档副本；旧 config.json 先归档
             {
@@ -397,6 +401,7 @@ pub fn run() {
             let _tray = tray_builder.build(app)?;
             // 将同一个实例注入到全局状态，避免重复创建导致的不一致
             app.manage(app_state);
+            app.manage(droid2api_service);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -465,6 +470,11 @@ pub fn run() {
             import_export::save_file_dialog,
             import_export::open_file_dialog,
             update_tray_menu,
+            // droid2api service management
+            droid2api_service::start_droid2api_service,
+            droid2api_service::stop_droid2api_service,
+            droid2api_service::get_droid2api_service_status,
+            droid2api_service::test_droid2api_connection,
         ]);
 
     let app = builder

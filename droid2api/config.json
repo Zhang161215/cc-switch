@@ -1,0 +1,61 @@
+{
+  "port": 3000,
+  "model_redirects": {
+    "claude-3-5-haiku-20241022": "claude-sonnet-4-5-20250929",
+    "claude-sonnet-4-5": "claude-sonnet-4-5-20250929"
+  },
+  "endpoint": [
+    {
+      "name": "openai",
+      "base_url": "https://app.factory.ai/api/llm/o/v1/responses"
+    },
+    {
+      "name": "anthropic",
+      "base_url": "https://app.factory.ai/api/llm/a/v1/messages"
+    },
+    {
+      "name": "common",
+      "base_url": "https://app.factory.ai/api/llm/o/v1/chat/completions"
+    }
+  ],
+  "models": [
+    {
+      "name": "Opus 4.1",
+      "id": "claude-opus-4-1-20250805",
+      "type": "anthropic",
+      "reasoning": "auto"
+    },
+    {
+      "name": "Sonnet 4",
+      "id": "claude-sonnet-4-20250514",
+      "type": "anthropic",
+      "reasoning": "auto"
+    },
+    {
+      "name": "Sonnet 4.5",
+      "id": "claude-sonnet-4-5-20250929",
+      "type": "anthropic",
+      "reasoning": "auto"
+    },
+    {
+      "name": "GPT-5",
+      "id": "gpt-5-2025-08-07",
+      "type": "openai",
+      "reasoning": "auto"
+    },
+    {
+      "name": "GPT-5-Codex",
+      "id": "gpt-5-codex",
+      "type": "openai",
+      "reasoning": "off"
+    },
+    {
+      "name": "GLM-4.6",
+      "id": "glm-4.6",
+      "type": "common"
+    }
+  ],
+  "dev_mode": false,
+  "user_agent": "factory-cli/0.19.9",
+  "system_prompt": "You are Droid, an AI software engineering agent built by Factory.\n\n"
+}

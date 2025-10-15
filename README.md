@@ -1,12 +1,14 @@
 # Claude Code & Codex & Droid 供应商切换器
 
-[![Version](https://img.shields.io/badge/version-3.5.0-blue.svg)](https://github.com/Zhang161215/cc-switch/releases)
+[![Version](https://img.shields.io/badge/version-3.5.1-blue.svg)](https://github.com/Zhang161215/cc-switch/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/Zhang161215/cc-switch/releases)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-orange.svg)](https://tauri.app/)
 
 一个用于管理和切换 Claude Code、Codex 与 Droid 不同供应商配置的桌面应用。
 
 > **📢 重要通知**：ccd-switch 即将进行大规模重构，请暂缓提交新的 PR，感谢理解与配合！
+
+> v3.5.1 ：新增 **droid2api 本地代理服务**，支持将 Droid API 转换为 OpenAI 兼容格式，方便与各类 AI 工具集成。
 
 > v3.5.0 ：新增 **MCP 管理**、**配置导入/导出**、**端点速度测试**功能，完善国际化覆盖，新增 Longcat、kat-coder 预设，标准化发布文件命名规范。
 
@@ -20,8 +22,15 @@
 
 > v3.0.0 重大更新：从 Electron 完全迁移到 Tauri 2.0，应用体积显著降低、启动性能大幅提升。
 
-## 功能特性（v3.5.0）
+## 功能特性（v3.5.1）
 
+- **droid2api 本地代理服务**：内置 OpenAI 兼容的 API 代理服务
+  - 一键启动/停止本地 API 代理服务（基于 [droid2api](https://github.com/1e0n/droid2api)）
+  - 自动转换 Droid API 为 OpenAI 兼容格式（支持 `/v1/chat/completions`、`/v1/messages` 等端点）
+  - 支持多种 AI 模型：Claude、GPT、GLM 等
+  - 智能推理级别控制和请求格式转换
+  - 实时服务状态监控和连接测试
+  - 方便与 Cursor、Continue 等工具集成
 - **MCP (Model Context Protocol) 管理**：完整的 MCP 服务器配置管理系统
   - 支持 stdio 和 http 服务器类型，并提供命令校验
   - 内置常用 MCP 服务器模板（如 mcp-fetch 等）
@@ -49,6 +58,10 @@
 ### Droid多Key管理
 
 ![Droid多Key管理](screenshots/droid-management.png)
+
+### droid2api 本地代理服务
+
+![droid2api服务](screenshots/droid2api.png)
 
 ### 添加供应商
 
@@ -131,6 +144,18 @@ brew upgrade --cask ccd-switch
 
 ### Droid 说明
 
+- **droid2api 本地代理服务**：
+  - 在设置页面一键启动/停止本地 API 代理服务
+  - 服务运行在 `http://localhost:3000`，提供 OpenAI 兼容的 API 端点
+  - 支持的端点：
+    - `GET /v1/models` - 获取可用模型列表
+    - `POST /v1/chat/completions` - OpenAI 格式的聊天补全
+    - `POST /v1/messages` - Anthropic 格式的消息接口
+    - `POST /v1/responses` - Factory 格式的响应接口
+  - 自动查找系统中的 Node.js，无需额外配置
+  - 实时服务状态监控，显示运行状态、端口和进程 PID
+  - 启动服务后会自动等待服务就绪（最多5秒）
+  - 可与 Cursor、Continue、Copilot 等工具无缝集成
 - **多 API Key 管理**：支持同时管理多个 Factory AI API Key
   - 汇总显示所有 Key 的总额度、剩余额度和使用率
   - 支持为每个 Key 设置名称标识
@@ -259,6 +284,10 @@ cargo test
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=Zhang161215/cc-switch&type=Date)](https://www.star-history.com/#Zhang161215/cc-switch&Date)
+
+## 致谢
+
+- [droid2api](https://github.com/1e0n/droid2api) - 提供了 OpenAI 兼容 API 代理的核心实现，本项目的 droid2api 功能基于此项目开发
 
 ## License
 
