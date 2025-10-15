@@ -68,6 +68,18 @@ jobs:
           fi
           ls -la release-files/
       
+      # 下面这个步骤是新增的，自动删除已存在的同名 Release 资源（如果有）
+      - name: Remove existing assets if exists
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          for file in release-files/*; do
+            filename=$(basename "$file")
+            gh release delete-asset "${GITHUB_REF#refs/tags/}" "$filename" --yes || true
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
       - name: 上传到Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
