@@ -129,21 +129,48 @@ pub async fn start_droid2api_service(
             }
         }
     } else {
-        // 生产模式：使用打包的资源目录
-        let resource_dir = app_handle
-            .path()
-            .resource_dir()
-            .map_err(|e| format!("Failed to get resource directory: {}", e))?;
-        // Tauri将 ../droid2api 打包为 _up_/droid2api
-        resource_dir.join("_up_").join("droid2api")
+        // 生产模式：根据平台选择不同路径
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: 在用户文档目录查找 droid2api
+            // 用户需要手动下载并放置到 %USERPROFILE%\Documents\droid2api
+            let documents_dir = app_handle
+                .path()
+                .document_dir()
+                .map_err(|e| format!("Failed to get documents directory: {}", e))?;
+            documents_dir.join("droid2api")
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            // macOS/Linux: 使用打包的资源目录
+            let resource_dir = app_handle
+                .path()
+                .resource_dir()
+                .map_err(|e| format!("Failed to get resource directory: {}", e))?;
+            // Tauri将 ../droid2api 打包为 _up_/droid2api
+            resource_dir.join("_up_").join("droid2api")
+        }
     };
     
     // 检查 droid2api 目录是否存在
     if !droid2api_dir.exists() {
-        return Err(format!(
-            "droid2api directory not found at: {}",
-            droid2api_dir.display()
-        ));
+        #[cfg(target_os = "windows")]
+        {
+            return Err(format!(
+                "droid2api not found at: {}\n\n\
+                Please download droid2api from https://github.com/1e0n/droid2api\n\
+                and extract it to: {}",
+                droid2api_dir.display(),
+                droid2api_dir.display()
+            ));
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            return Err(format!(
+                "droid2api directory not found at: {}",
+                droid2api_dir.display()
+            ));
+        }
     }
 
     // 查找 Node.js 可执行文件
