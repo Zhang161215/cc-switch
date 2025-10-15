@@ -46,6 +46,13 @@ impl Default for ProxyConfig {
                     endpoint_id: "factory-anthropic".to_string(),
                     reasoning: Some("extended".to_string()),
                 },
+                ModelConfig {
+                    id: "claude-sonnet-4-5-20250929".to_string(),
+                    model_type: "anthropic".to_string(),
+                    name: "Claude Sonnet 4.5".to_string(),
+                    endpoint_id: "factory-anthropic".to_string(),
+                    reasoning: Some("extended".to_string()),
+                },
             ],
             endpoints: vec![
                 EndpointConfig {
