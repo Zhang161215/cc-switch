@@ -42,6 +42,7 @@ impl ProxyServer {
             .route("/v1/models", get(list_models))
             .route("/v1/chat/completions", post(chat_completions))
             .route("/v1/responses", post(super::routes::responses_proxy))
+            .route("/v1/messages", post(super::routes::messages_proxy))
             .layer(cors)
             .with_state(app_state);
 
