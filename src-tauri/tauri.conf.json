@@ -29,7 +29,11 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": {
+      "linux": ["deb", "appimage"],
+      "macOS": ["dmg"],
+      "windows": ["nsis"]
+    },
     "createUpdaterArtifacts": false,
     "icon": [
       "icons/32x32.png",
