@@ -26,36 +26,37 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: 安装Linux依赖
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev librsvg2-dev
-      
+
+      - name: 安装 WiX Toolset
+        if: matrix.os == 'windows-latest'
+        run: choco install wix --version=3.11.2 -y
+
       - uses: pnpm/action-setup@v2
         with:
           version: 8
-          
+
       - uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: 'pnpm'
-      - name: 安装 WiX Toolset
-        if: matrix.os == 'windows-latest'
-        run: choco install wixtoolset -y    
-          
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      
+
       - name: 安装依赖
         run: pnpm install --no-frozen-lockfile
-        
+
       - name: 构建
         run: pnpm tauri build --target ${{ matrix.target }}
-      
+
       - name: 准备发布文件
         shell: bash
         run: |
@@ -70,8 +71,7 @@ jobs:
             cp src-tauri/target/release/bundle/appimage/*.AppImage release-files/ 2>/dev/null || true
           fi
           ls -la release-files/
-      
-      # 下面这个步骤是新增的，自动删除已存在的同名 Release 资源（如果有）
+
       - name: Remove existing assets if exists
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
@@ -82,7 +82,7 @@ jobs:
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: 上传到Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
@@ -92,7 +92,7 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: 手动版本上传
         uses: softprops/action-gh-release@v1
         if: github.event_name == 'workflow_dispatch'
