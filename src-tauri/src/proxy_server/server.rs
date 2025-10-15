@@ -90,6 +90,7 @@ pub type ProxyServerState = Arc<Mutex<Option<ProxyServer>>>;
 #[tauri::command]
 pub async fn start_proxy_server(
     state: State<'_, ProxyServerState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
     let mut server_guard = state.lock().await;
 
@@ -98,12 +99,41 @@ pub async fn start_proxy_server(
     }
 
     let mut server = ProxyServer::new(3000);
-    let config = ProxyConfig::default(); // TODO: 从配置文件加载
+    
+    // 从 Droid 配置读取 API Key
+    let mut config = ProxyConfig::default();
+    
+    // 尝试读取当前 Droid provider 的 API key
+    if let Ok(Some(api_key)) = get_current_droid_api_key(&app_handle).await {
+        log::info!("Loaded API key from Droid configuration");
+        for endpoint in &mut config.endpoints {
+            endpoint.api_key = api_key.clone();
+        }
+    } else {
+        log::warn!("No API key found in Droid configuration, using empty key");
+    }
     
     server.start(config).await?;
     *server_guard = Some(server);
 
     Ok("Proxy server started on http://localhost:3000".to_string())
+}
+
+// 从 Droid 配置获取当前 API Key
+async fn get_current_droid_api_key(app_handle: &tauri::AppHandle) -> Result<Option<String>, String> {
+    use crate::store::AppState;
+    
+    if let Some(app_state) = app_handle.try_state::<AppState>() {
+        let config = app_state.config.lock().map_err(|e| e.to_string())?;
+        
+        if let Some(droid_manager) = config.get_manager(&crate::app_config::AppType::Droid) {
+            if let Some(current_provider) = droid_manager.providers.get(&droid_manager.current) {
+                return Ok(Some(current_provider.api_key.clone()));
+            }
+        }
+    }
+    
+    Ok(None)
 }
 
 #[tauri::command]
