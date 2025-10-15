@@ -193,6 +193,9 @@ pub async fn start_droid2api_service(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .env("NODE_ENV", "production");
+    
+    // 不传递 FACTORY_API_KEY，让 droid2api 使用客户端请求中的 Authorization header
+    // 这样可以支持多用户使用不同的 API Key
 
     let child = command.spawn().map_err(|e| {
         format!("Failed to start droid2api service: {}. Make sure Node.js is installed.", e)

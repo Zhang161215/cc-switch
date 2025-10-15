@@ -393,7 +393,7 @@ const DroidProviderList: React.FC<DroidProviderListProps> = ({
         if (currentProvider && (currentProvider.api_key || (currentProvider.api_keys && currentProvider.api_keys.length > 0))) {
           fetchBalance(currentProvider);
         }
-      }, 10000); // 10秒刷新一次
+      }, 60000); // 60秒刷新一次（降低API调用频率）
 
       return () => clearInterval(interval);
     }

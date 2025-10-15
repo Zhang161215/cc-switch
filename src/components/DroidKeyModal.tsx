@@ -127,74 +127,79 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
   };
 
   const handleRefreshBalances = async () => {
-    if (!formData.api_keys || formData.api_keys.length === 0) return;
-    
-    try {
-      // 提取所有的API Keys
-      const apiKeys = formData.api_keys.map(k => k.key);
+    // 异步刷新余额，使用函数式更新避免闭包陷阱
+    setFormData(currentFormData => {
+      if (!currentFormData.api_keys || currentFormData.api_keys.length === 0) {
+        return currentFormData;
+      }
       
-      // 批量查询余额
-      const balances = await window.api.fetchMultipleDroidBalances(apiKeys);
-      console.log('Fetched balances:', balances);
-      
-      // 更新每个Key的余额信息
-      const updatedKeys = formData.api_keys.map((key, index) => {
-        const balanceData = balances[index];
-        if (balanceData && balanceData !== null) {
-          // 从Factory API获取的数据结构中提取信息
-          let totalAllowance = 20000000; // 默认20M tokens
-          let totalUsed = 0;
+      // 启动异步操作
+      (async () => {
+        try {
+          // 使用当前最新的keys
+          const apiKeysToFetch = currentFormData.api_keys!.map(k => k.key);
+          const balances = await window.api.fetchMultipleDroidBalances(apiKeysToFetch);
+          console.log('Fetched balances:', balances);
           
-          // 正确的数据路径是 data.usage.standard
-          if (balanceData.usage && balanceData.usage.standard) {
-            totalAllowance = balanceData.usage.standard.totalAllowance || 20000000;
-            totalUsed = balanceData.usage.standard.orgTotalTokensUsed || 0;
-          } else {
-            // 备用字段
-            totalAllowance = 
-              balanceData.max_tokens_per_day || 
-              balanceData.totalAllowance || 
-              balanceData.quotas?.tokens_per_day ||
-              20000000;
-            totalUsed = 
-              balanceData.tokens_used_today || 
-              balanceData.totalUsed || 
-              balanceData.usage?.tokens_today ||
-              0;
-          }
-          const remaining = totalAllowance - totalUsed;
-          const usedRatio = totalAllowance > 0 ? totalUsed / totalAllowance : 0;
-          
-          return {
-            ...key,
-            balance: {
-              total_allowance: totalAllowance,
-              total_used: totalUsed,
-              remaining,
-              used_ratio: usedRatio,
-              last_checked: Date.now()
-            }
-          };
-        } else {
-          // 如果没有获取到数据，提供默认值
-          return {
-            ...key,
-            balance: {
-              total_allowance: 20000000, // 默认20M tokens
-              total_used: 0,
-              remaining: 20000000,
-              used_ratio: 0,
-              last_checked: Date.now()
-            }
-          };
+          // 使用函数式更新来保证更新到最新状态
+          setFormData(latestFormData => ({
+            ...latestFormData,
+            api_keys: latestFormData.api_keys!.map((key, index) => {
+              const balanceData = balances[index];
+              if (balanceData && balanceData !== null) {
+                let totalAllowance = 20000000;
+                let totalUsed = 0;
+                
+                if (balanceData.usage && balanceData.usage.standard) {
+                  totalAllowance = balanceData.usage.standard.totalAllowance || 20000000;
+                  totalUsed = balanceData.usage.standard.orgTotalTokensUsed || 0;
+                } else {
+                  totalAllowance = 
+                    balanceData.max_tokens_per_day || 
+                    balanceData.totalAllowance || 
+                    balanceData.quotas?.tokens_per_day ||
+                    20000000;
+                  totalUsed = 
+                    balanceData.tokens_used_today || 
+                    balanceData.totalUsed || 
+                    balanceData.usage?.tokens_today ||
+                    0;
+                }
+                const remaining = totalAllowance - totalUsed;
+                const usedRatio = totalAllowance > 0 ? totalUsed / totalAllowance : 0;
+                
+                return {
+                  ...key,
+                  balance: {
+                    total_allowance: totalAllowance,
+                    total_used: totalUsed,
+                    remaining,
+                    used_ratio: usedRatio,
+                    last_checked: Date.now()
+                  }
+                };
+              } else {
+                return {
+                  ...key,
+                  balance: {
+                    total_allowance: 20000000,
+                    total_used: 0,
+                    remaining: 20000000,
+                    used_ratio: 0,
+                    last_checked: Date.now()
+                  }
+                };
+              }
+            })
+          }));
+        } catch (error) {
+          console.error("Failed to refresh balances:", error);
         }
-        return key;
-      });
+      })();
       
-      setFormData({ ...formData, api_keys: updatedKeys });
-    } catch (error) {
-      console.error("Failed to refresh balances:", error);
-    }
+      // 立即返回当前状态，不阻塞
+      return currentFormData;
+    });
   };
 
   const isEditing = !!provider;
