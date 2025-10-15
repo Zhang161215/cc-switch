@@ -38,9 +38,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "../droid2api"
-    ],
+    "resources": [],
     "windows": {
       "wix": {
         "template": "wix/per-user-main.wxs"
