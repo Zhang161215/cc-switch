@@ -129,26 +129,32 @@ pub async fn start_droid2api_service(
             }
         }
     } else {
-        // 生产模式：根据平台选择不同路径
+        // 生产模式：使用打包的资源目录
+        let resource_dir = app_handle
+            .path()
+            .resource_dir()
+            .map_err(|e| format!("Failed to get resource directory: {}", e))?;
+        
+        // Tauri将 ../droid2api 打包为 _up_/droid2api
+        let bundled_path = resource_dir.join("_up_").join("droid2api");
+        
+        // Windows: 如果打包路径不存在，尝试从用户文档目录读取
         #[cfg(target_os = "windows")]
         {
-            // Windows: 在用户文档目录查找 droid2api
-            // 用户需要手动下载并放置到 %USERPROFILE%\Documents\droid2api
-            let documents_dir = app_handle
-                .path()
-                .document_dir()
-                .map_err(|e| format!("Failed to get documents directory: {}", e))?;
-            documents_dir.join("droid2api")
+            if !bundled_path.exists() {
+                log::warn!("Bundled droid2api not found, trying user documents directory");
+                let documents_dir = app_handle
+                    .path()
+                    .document_dir()
+                    .map_err(|e| format!("Failed to get documents directory: {}", e))?;
+                documents_dir.join("droid2api")
+            } else {
+                bundled_path
+            }
         }
         #[cfg(not(target_os = "windows"))]
         {
-            // macOS/Linux: 使用打包的资源目录
-            let resource_dir = app_handle
-                .path()
-                .resource_dir()
-                .map_err(|e| format!("Failed to get resource directory: {}", e))?;
-            // Tauri将 ../droid2api 打包为 _up_/droid2api
-            resource_dir.join("_up_").join("droid2api")
+            bundled_path
         }
     };
     
