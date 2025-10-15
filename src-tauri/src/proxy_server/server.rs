@@ -41,6 +41,7 @@ impl ProxyServer {
             .route("/", get(|| async { "droid2api - Rust Edition" }))
             .route("/v1/models", get(list_models))
             .route("/v1/chat/completions", post(chat_completions))
+            .route("/v1/responses", post(super::routes::responses_proxy))
             .layer(cors)
             .with_state(app_state);
 

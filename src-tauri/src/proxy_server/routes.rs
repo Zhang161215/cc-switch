@@ -256,3 +256,73 @@ async fn handle_openai_request(
 
     Ok(Json(body))
 }
+
+// POST /v1/responses - Factory AI 格式（转发到真实端点）
+pub async fn responses_proxy(
+    State(config): State<AppState>,
+    Json(req): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    log::info!("POST /v1/responses - Factory format");
+    
+    // 获取模型ID
+    let model_id = req["model"]
+        .as_str()
+        .ok_or_else(|| ApiError {
+            status: StatusCode::BAD_REQUEST,
+            message: "model field is required".to_string(),
+        })?;
+    
+    // 查找模型配置
+    let model = config
+        .get_model(model_id)
+        .ok_or_else(|| ApiError {
+            status: StatusCode::NOT_FOUND,
+            message: format!("Model '{}' not found", model_id),
+        })?;
+    
+    // 查找端点配置
+    let endpoint = config
+        .get_endpoint(&model.endpoint_id)
+        .ok_or_else(|| ApiError {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            message: "Endpoint not found".to_string(),
+        })?;
+    
+    log::info!(
+        "Proxying to endpoint: {} (type: {})",
+        endpoint.base_url,
+        endpoint.endpoint_type
+    );
+    
+    // 直接转发请求到上游
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&endpoint.base_url)
+        .header("x-api-key", &endpoint.api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .json(&req)
+        .send()
+        .await
+        .map_err(|e| ApiError {
+            status: StatusCode::BAD_GATEWAY,
+            message: format!("Failed to call upstream API: {}", e),
+        })?;
+    
+    let status = response.status();
+    
+    if !status.is_success() {
+        let error_body = response.text().await.unwrap_or_default();
+        return Err(ApiError {
+            status,
+            message: format!("Upstream API error: {}", error_body),
+        });
+    }
+    
+    let body: Value = response.json().await.map_err(|e| ApiError {
+        status: StatusCode::BAD_GATEWAY,
+        message: format!("Failed to parse response: {}", e),
+    })?;
+    
+    Ok(Json(body))
+}
