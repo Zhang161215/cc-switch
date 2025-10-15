@@ -54,6 +54,12 @@ jobs:
       - name: 安装依赖
         run: pnpm install --no-frozen-lockfile
 
+      - name: 安装 droid2api 依赖
+        run: |
+           cd droid2api
+           npm install --production
+           cd ..
+
       - name: 构建
         run: pnpm tauri build --target ${{ matrix.target }}
 
