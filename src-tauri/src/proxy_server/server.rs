@@ -120,13 +120,32 @@ pub async fn start_proxy_server(
 }
 
 // 从 Droid 配置获取当前 API Key
-// TODO: 实现从配置文件读取
-async fn get_current_droid_api_key(_app_handle: &tauri::AppHandle) -> Result<Option<String>, String> {
-    // 暂时从环境变量读取
+async fn get_current_droid_api_key(app_handle: &tauri::AppHandle) -> Result<Option<String>, String> {
+    use crate::store::AppState;
+    use tauri::Manager;
+    
+    // 从应用状态获取配置
+    let app_state = app_handle.state::<AppState>();
+    let config = app_state.config.lock().map_err(|e| e.to_string())?;
+    
+    // 从 droid_manager 获取当前 provider 的 API Key
+    if let Some(droid_manager) = &config.droid_manager {
+        if let Some(current_provider) = droid_manager.providers
+            .iter()
+            .find(|p| p.id == droid_manager.current)
+        {
+            log::info!("Loaded API key from Droid provider: {}", current_provider.name);
+            return Ok(Some(current_provider.api_key.clone()));
+        }
+    }
+    
+    // 回退到环境变量
     if let Ok(api_key) = std::env::var("FACTORY_API_KEY") {
+        log::info!("Loaded API key from environment variable");
         return Ok(Some(api_key));
     }
     
+    log::warn!("No API key found in configuration or environment");
     Ok(None)
 }
 
