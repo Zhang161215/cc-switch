@@ -28,7 +28,7 @@ pub struct ModelInfo {
 }
 
 // OpenAI 聊天补全请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ChatCompletionRequest {
     pub model: String,
     pub messages: Vec<Message>,
@@ -47,7 +47,7 @@ pub struct Message {
 }
 
 // OpenAI 聊天补全响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ChatCompletionResponse {
     id: String,
     object: String,
@@ -57,14 +57,14 @@ pub struct ChatCompletionResponse {
     usage: Usage,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Choice {
     index: i32,
     message: Message,
     finish_reason: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Usage {
     prompt_tokens: u32,
     completion_tokens: u32,
