@@ -29,11 +29,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": {
-      "linux": ["deb", "appimage"],
-      "macOS": ["dmg"],
-      "windows": ["nsis"]
-    },
+    "targets": ["deb", "appimage", "dmg", "nsis"],
     "createUpdaterArtifacts": false,
     "icon": [
       "icons/32x32.png",
@@ -52,7 +48,7 @@
       "nsis": {
         "license": "../LICENSE",
         "installerIcon": "icons/icon.ico",
-        "install-mode": "currentUser",
+        "installMode": "currentUser",
         "languages": ["SimpChinese", "English"]
       }
     }
