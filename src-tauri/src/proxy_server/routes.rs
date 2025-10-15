@@ -326,3 +326,51 @@ pub async fn responses_proxy(
     
     Ok(Json(body))
 }
+
+// POST /v1/messages - Anthropic 原生格式（Claude Code 使用）
+pub async fn messages_proxy(
+    State(config): State<AppState>,
+    Json(req): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    log::info!("POST /v1/messages - Anthropic native format");
+    
+    let model_id = req["model"].as_str().unwrap_or("claude-sonnet-4-20250514");
+    let model = config.get_model(model_id).ok_or_else(|| ApiError {
+        status: StatusCode::NOT_FOUND,
+        message: format!("Model '{}' not found", model_id),
+    })?;
+    
+    let endpoint = config.get_endpoint(&model.endpoint_id).ok_or_else(|| ApiError {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        message: "Endpoint not found".to_string(),
+    })?;
+    
+    log::info!("Proxying /v1/messages to: {}", endpoint.base_url);
+    
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&endpoint.base_url)
+        .header("x-api-key", &endpoint.api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .json(&req)
+        .send()
+        .await
+        .map_err(|e| ApiError {
+            status: StatusCode::BAD_GATEWAY,
+            message: format!("Failed to call upstream API: {}", e),
+        })?;
+    
+    let status = response.status();
+    if !status.is_success() {
+        let error_body = response.text().await.unwrap_or_default();
+        return Err(ApiError { status, message: format!("Upstream API error: {}", error_body) });
+    }
+    
+    let body: Value = response.json().await.map_err(|e| ApiError {
+        status: StatusCode::BAD_GATEWAY,
+        message: format!("Failed to parse response: {}", e),
+    })?;
+    
+    Ok(Json(body))
+}
