@@ -10,6 +10,7 @@ mod import_export;
 mod mcp;
 mod migration;
 mod provider;
+mod proxy_server;
 mod settings;
 mod speedtest;
 mod store;
@@ -399,9 +400,14 @@ pub fn run() {
             tray_builder = tray_builder.icon(app.default_window_icon().unwrap().clone());
 
             let _tray = tray_builder.build(app)?;
+            // 初始化 Rust 代理服务器状态
+            let proxy_server_state: proxy_server::ProxyServerState = 
+                std::sync::Arc::new(tokio::sync::Mutex::new(None));
+            
             // 将同一个实例注入到全局状态，避免重复创建导致的不一致
             app.manage(app_state);
             app.manage(droid2api_service);
+            app.manage(proxy_server_state);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -470,11 +476,15 @@ pub fn run() {
             import_export::save_file_dialog,
             import_export::open_file_dialog,
             update_tray_menu,
-            // droid2api service management
+            // droid2api service management (Node.js version)
             droid2api_service::start_droid2api_service,
             droid2api_service::stop_droid2api_service,
             droid2api_service::get_droid2api_service_status,
             droid2api_service::test_droid2api_connection,
+            // proxy server (Rust version)
+            proxy_server::start_proxy_server,
+            proxy_server::stop_proxy_server,
+            proxy_server::get_proxy_server_status,
         ]);
 
     let app = builder
