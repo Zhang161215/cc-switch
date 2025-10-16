@@ -94,6 +94,10 @@ pub struct DroidProvider {
     pub supports_prompt_caching: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balance: Option<KeyBalance>, // 缓存的余额信息
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_invalid: Option<bool>, // 标识账号是否已失效（401错误）
 }
 
 /// Get the Factory config directory path

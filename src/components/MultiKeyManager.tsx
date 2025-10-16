@@ -103,12 +103,12 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  // 初次加载时自动刷新余额
-  useEffect(() => {
-    if (apiKeys.length > 0 && !apiKeys.some(key => key.balance)) {
-      handleRefreshAll();
-    }
-  }, [apiKeys.length]);
+  // 初次加载时自动刷新余额 - 已禁用自动刷新
+  // useEffect(() => {
+  //   if (apiKeys.length > 0 && !apiKeys.some(key => key.balance)) {
+  //     handleRefreshAll();
+  //   }
+  // }, [apiKeys.length]);
 
   return (
     <div className="space-y-4">

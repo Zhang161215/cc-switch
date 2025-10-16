@@ -464,6 +464,9 @@ pub fn run() {
             commands::get_factory_custom_models,
             commands::delete_factory_custom_model,
             commands::update_factory_custom_model,
+            commands::set_factory_api_key_env,
+            commands::get_factory_api_key_env,
+            commands::remove_factory_api_key_env,
             // theirs: config import/export and dialogs
             import_export::export_config_to_file,
             import_export::import_config_from_file,

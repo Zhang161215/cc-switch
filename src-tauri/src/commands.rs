@@ -1471,27 +1471,39 @@ pub async fn switch_droid_provider(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<(), String> {
-    let mut config = state
-        .config
-        .lock()
-        .map_err(|e| format!("获取锁失败: {}", e))?;
-    
-    if let Some(droid_manager) = &mut config.droid_manager {
-        let provider = droid_manager.providers.iter().find(|p| p.id == id)
-            .ok_or_else(|| format!("Provider {} 不存在", id))?
-            .clone();
-        
-        droid_manager.current = id;
-        
-        drop(config);
-        
-        // 应用到 Factory 配置
-        crate::droid_config::apply_provider_to_factory(&provider)?;
-        state.save()?;
-        Ok(())
-    } else {
-        Err("Droid manager 未初始化".to_string())
-    }
+    // 先获取 provider 信息并更新配置，然后释放锁
+    let (provider, api_key) = {
+        let mut config = state
+            .config
+            .lock()
+            .map_err(|e| format!("获取锁失败: {}", e))?;
+
+        if let Some(droid_manager) = &mut config.droid_manager {
+            let provider = droid_manager.providers.iter().find(|p| p.id == id)
+                .ok_or_else(|| format!("Provider {} 不存在", id))?
+                .clone();
+
+            let api_key = provider.api_key.clone();
+            droid_manager.current = id;
+
+            (provider, api_key)
+        } else {
+            return Err("Droid manager 未初始化".to_string());
+        }
+    }; // config 在这里被自动释放
+
+    // 应用到 Factory 配置
+    crate::droid_config::apply_provider_to_factory(&provider)?;
+
+    // 🐾 立即更新当前进程的环境变量（这样UI和子进程都能立即使用）
+    std::env::set_var("FACTORY_API_KEY", &api_key);
+    println!("✓ 已设置进程环境变量 FACTORY_API_KEY");
+
+    // 同时更新 shell 配置文件（让新开的终端也能用）
+    set_factory_api_key_env(api_key).await?;
+
+    state.save()?;
+    Ok(())
 }
 
 /// 查询 Droid Provider 余额
@@ -1677,4 +1689,207 @@ pub async fn update_factory_custom_model(
     
     crate::droid_config::write_factory_config(&config)?;
     Ok(())
+}
+
+/// 设置 FACTORY_API_KEY 环境变量到 shell 配置文件
+#[tauri::command]
+pub async fn set_factory_api_key_env(api_key: String) -> Result<bool, String> {
+    use std::fs;
+    use std::io::{Read, Write};
+    
+    let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
+    
+    // 尝试按优先级查找 shell 配置文件
+    let shell_configs = vec![
+        home_dir.join(".zshrc"),
+        home_dir.join(".bash_profile"),
+        home_dir.join(".bashrc"),
+    ];
+    
+    let config_file = shell_configs
+        .iter()
+        .find(|p| p.exists())
+        .or(shell_configs.first())
+        .ok_or("无法找到 shell 配置文件")?;
+    
+    // 读取现有内容
+    let mut content = String::new();
+    if config_file.exists() {
+        let mut file = fs::File::open(config_file)
+            .map_err(|e| format!("无法读取配置文件: {}", e))?;
+        file.read_to_string(&mut content)
+            .map_err(|e| format!("无法读取配置文件内容: {}", e))?;
+    }
+    
+    // 检查是否已存在 FACTORY_API_KEY 配置
+    let export_line = format!("export FACTORY_API_KEY=\"{}\"", api_key);
+    let marker_start = "# CC-Switch Droid Config - Start";
+    let marker_end = "# CC-Switch Droid Config - End";
+    
+    // 移除旧的配置块（如果存在）
+    let lines: Vec<&str> = content.lines().collect();
+    let mut new_lines = Vec::new();
+    let mut skip = false;
+    
+    for line in lines {
+        if line.contains(marker_start) {
+            skip = true;
+            continue;
+        }
+        if line.contains(marker_end) {
+            skip = false;
+            continue;
+        }
+        if !skip {
+            new_lines.push(line);
+        }
+    }
+    
+    // 添加新的配置块
+    new_lines.push("");
+    new_lines.push(marker_start);
+    new_lines.push(&export_line);
+    new_lines.push(marker_end);
+    
+    let new_content = new_lines.join("\n") + "\n";
+    
+    // 写入文件
+    let mut file = fs::File::create(config_file)
+        .map_err(|e| format!("无法写入配置文件: {}", e))?;
+    file.write_all(new_content.as_bytes())
+        .map_err(|e| format!("无法写入配置: {}", e))?;
+    
+    println!("✓ FACTORY_API_KEY 已写入 {}", config_file.display());
+    println!("✓ 请在新的终端窗口中使用，或执行: source {}", config_file.display());
+    
+    Ok(true)
+}
+
+/// 从 shell 配置文件读取 FACTORY_API_KEY（实时读取最新值）
+#[tauri::command]
+pub async fn get_factory_api_key_env() -> Result<Option<String>, String> {
+    use std::io::{BufRead, BufReader};
+
+    let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
+
+    // 按优先级尝试读取 shell 配置文件
+    let shell_configs = vec![
+        home_dir.join(".zshrc"),
+        home_dir.join(".bash_profile"),
+        home_dir.join(".bashrc"),
+    ];
+
+    for config_path in shell_configs {
+        if !config_path.exists() {
+            continue;
+        }
+
+        // 读取配置文件，查找 FACTORY_API_KEY
+        if let Ok(file) = std::fs::File::open(&config_path) {
+            let reader = BufReader::new(file);
+            let mut in_droid_config_block = false;
+
+            for line in reader.lines() {
+                if let Ok(line) = line {
+                    let trimmed = line.trim();
+
+                    // 检测 CC-Switch Droid Config 块的开始
+                    if trimmed.contains("CC-Switch Droid Config - Start") {
+                        in_droid_config_block = true;
+                        continue;
+                    }
+
+                    // 检测块的结束
+                    if trimmed.contains("CC-Switch Droid Config - End") {
+                        in_droid_config_block = false;
+                        continue;
+                    }
+
+                    // 在配置块内查找 export FACTORY_API_KEY
+                    if in_droid_config_block && trimmed.starts_with("export FACTORY_API_KEY=") {
+                        // 提取引号内的值
+                        if let Some(value_part) = trimmed.strip_prefix("export FACTORY_API_KEY=") {
+                            let value = value_part
+                                .trim()
+                                .trim_matches('"')
+                                .trim_matches('\'')
+                                .to_string();
+
+                            if !value.is_empty() {
+                                return Ok(Some(value));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 如果配置文件中没有找到，返回 None
+    Ok(None)
+}
+
+/// 从 shell 配置文件移除 FACTORY_API_KEY
+#[tauri::command]
+pub async fn remove_factory_api_key_env() -> Result<bool, String> {
+    use std::fs;
+    use std::io::{Read, Write};
+    
+    let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
+    
+    // 尝试按优先级查找 shell 配置文件
+    let shell_configs = vec![
+        home_dir.join(".zshrc"),
+        home_dir.join(".bash_profile"),
+        home_dir.join(".bashrc"),
+    ];
+    
+    let mut removed = false;
+    
+    for config_file in shell_configs {
+        if !config_file.exists() {
+            continue;
+        }
+        
+        let mut content = String::new();
+        let mut file = fs::File::open(&config_file)
+            .map_err(|e| format!("无法读取配置文件: {}", e))?;
+        file.read_to_string(&mut content)
+            .map_err(|e| format!("无法读取配置文件内容: {}", e))?;
+        
+        // 移除配置块
+        let marker_start = "# CC-Switch Droid Config - Start";
+        let marker_end = "# CC-Switch Droid Config - End";
+        
+        let lines: Vec<&str> = content.lines().collect();
+        let mut new_lines = Vec::new();
+        let mut skip = false;
+        let mut found = false;
+        
+        for line in lines {
+            if line.contains(marker_start) {
+                skip = true;
+                found = true;
+                continue;
+            }
+            if line.contains(marker_end) {
+                skip = false;
+                continue;
+            }
+            if !skip {
+                new_lines.push(line);
+            }
+        }
+        
+        if found {
+            let new_content = new_lines.join("\n") + "\n";
+            let mut file = fs::File::create(&config_file)
+                .map_err(|e| format!("无法写入配置文件: {}", e))?;
+            file.write_all(new_content.as_bytes())
+                .map_err(|e| format!("无法写入配置: {}", e))?;
+            removed = true;
+        }
+    }
+    
+    Ok(removed)
 }

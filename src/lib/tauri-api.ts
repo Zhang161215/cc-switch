@@ -683,6 +683,36 @@ export const tauriAPI = {
     }
   },
 
+  // 设置 FACTORY_API_KEY 环境变量
+  setFactoryApiKeyEnv: async (apiKey: string): Promise<boolean> => {
+    try {
+      return await invoke("set_factory_api_key_env", { apiKey });
+    } catch (error) {
+      console.error("设置 FACTORY_API_KEY 失败:", error);
+      throw error;
+    }
+  },
+
+  // 获取 FACTORY_API_KEY 环境变量
+  getFactoryApiKeyEnv: async (): Promise<string | null> => {
+    try {
+      return await invoke("get_factory_api_key_env");
+    } catch (error) {
+      console.error("获取 FACTORY_API_KEY 失败:", error);
+      throw error;
+    }
+  },
+
+  // 移除 FACTORY_API_KEY 环境变量
+  removeFactoryApiKeyEnv: async (): Promise<boolean> => {
+    try {
+      return await invoke("remove_factory_api_key_env");
+    } catch (error) {
+      console.error("移除 FACTORY_API_KEY 失败:", error);
+      throw error;
+    }
+  },
+
   // 查询 Droid provider 余额
   fetchDroidBalance: async (apiKey: string): Promise<any> => {
     try {

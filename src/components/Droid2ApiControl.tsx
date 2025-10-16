@@ -57,9 +57,9 @@ export function Droid2ApiControl({ className = '' }: Droid2ApiControlProps) {
   useEffect(() => {
     refreshStatus();
     
-    // 定期刷新状态
-    const interval = setInterval(refreshStatus, 10000); // 每10秒刷新一次
-    return () => clearInterval(interval);
+    // 定期刷新状态 - 已禁用自动刷新
+    // const interval = setInterval(refreshStatus, 10000); // 每10秒刷新一次
+    // return () => clearInterval(interval);
   }, []);
 
   const getStatusColor = () => {

@@ -5,8 +5,9 @@ import { AppType } from "./lib/tauri-api";
 import ProviderList from "./components/ProviderList";
 import AddProviderModal from "./components/AddProviderModal";
 import EditProviderModal from "./components/EditProviderModal";
-import DroidProviderList from "./components/DroidProviderList";
+import DroidProviderList, { DroidProviderListRef } from "./components/DroidProviderList";
 import DroidKeyModal from "./components/DroidKeyModal";
+import { FactoryEnvDisplay, FactoryEnvDisplayRef } from "./components/FactoryEnvDisplay";
 import FactoryModelsList from "./components/FactoryModelsList";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppSwitcher } from "./components/AppSwitcher";
@@ -46,6 +47,8 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMcpOpen, setIsMcpOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const factoryEnvRef = useRef<FactoryEnvDisplayRef>(null);
+  const droidProviderListRef = useRef<DroidProviderListRef>(null);
 
   // 设置通知的辅助函数
   const showNotification = (
@@ -143,7 +146,28 @@ function App() {
   const loadDroidProviders = async () => {
     try {
       const providers = await window.api.getDroidProviders();
-      const currentId = await window.api.getCurrentDroidProvider();
+      
+      // 优先从环境变量获取当前使用的 Key
+      const envApiKey = await window.api.getFactoryApiKeyEnv();
+      let currentId = "";
+      
+      if (envApiKey) {
+        // 根据环境变量中的 API Key 找到对应的 provider
+        const matchedProvider = providers.find(p => p.api_key === envApiKey);
+        if (matchedProvider) {
+          currentId = matchedProvider.id;
+          console.log(`从环境变量匹配到 provider: ${matchedProvider.name} (${currentId})`);
+        } else {
+          console.warn("环境变量中的 API Key 在列表中未找到");
+        }
+      }
+      
+      // 如果环境变量没有匹配到，使用存储的 currentId
+      if (!currentId) {
+        currentId = await window.api.getCurrentDroidProvider();
+        console.log(`使用存储的 currentId: ${currentId}`);
+      }
+      
       setDroidProviders(providers);
       setCurrentDroidProviderId(currentId);
     } catch (error) {
@@ -367,7 +391,13 @@ function App() {
   const handleSwitchDroidProvider = async (id: string) => {
     try {
       await window.api.switchDroidProvider(id);
-      setCurrentDroidProviderId(id);
+      await loadDroidProviders();
+      // 刷新环境变量显示
+      factoryEnvRef.current?.refresh();
+      // 自动查询余额
+      if (droidProviderListRef.current) {
+        await droidProviderListRef.current.fetchBalance(id);
+      }
       showNotification("已切换 Droid Key", "success", 2000);
     } catch (error) {
       console.error("切换 Droid Key 失败:", error);
@@ -455,6 +485,7 @@ function App() {
             {activeApp === "droid" ? (
               <>
                 <DroidProviderList
+                  ref={droidProviderListRef}
                   providers={droidProviders}
                   currentProviderId={currentDroidProviderId}
                   onSwitch={handleSwitchDroidProvider}
@@ -463,7 +494,7 @@ function App() {
                   onUpdate={handleUpdateDroidProvider}
                   onNotify={showNotification}
                 />
-                <FactoryModelsList onNotify={showNotification} />
+                <FactoryEnvDisplay ref={factoryEnvRef} currentProviderId={currentDroidProviderId} />
               </>
             ) : (
               <ProviderList

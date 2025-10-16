@@ -1,9 +1,7 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { DroidProvider, ApiKeyInfo, SwitchStrategy } from "../types";
-import { droidProviderPresets } from "../config/droidProviderPresets";
-import { X, ChevronDown, Sparkles } from "lucide-react";
-import MultiKeyManager from "./MultiKeyManager";
+import { DroidProvider } from "../types";
+import { X, Eye, EyeOff } from "lucide-react";
 
 interface DroidKeyModalProps {
   provider?: DroidProvider;
@@ -17,45 +15,15 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
   onClose,
 }) => {
   const { t } = useTranslation();
-  const [selectedPreset, setSelectedPreset] = useState<string>("");
-  
-  // 检查是否应该显示多key模式
-  const initialShowMultiKey = provider && provider.api_keys && provider.api_keys.length > 0;
-  const [showMultiKey, setShowMultiKey] = useState(initialShowMultiKey || false);
-  
+  const [showApiKey, setShowApiKey] = useState(false);
+
   const [formData, setFormData] = useState<DroidProvider>(
     provider || {
       id: "",
       name: "",
-      api_key: "",
-      api_keys: [],
-      current_key_index: 0,
-      switch_strategy: "manual" as SwitchStrategy,
-      base_url: "https://droid2api-2st1n.sevalla.app",
-      model: "claude-sonnet-4-5-20250929",
-      model_display_name: "Sonnet 4.5 [droid]",
-      provider: "anthropic",
-      max_tokens: 200000,
-      supports_prompt_caching: true
+      api_key: ""
     }
   );
-
-  const handlePresetChange = (presetName: string) => {
-    setSelectedPreset(presetName);
-    const preset = droidProviderPresets.find(p => p.name === presetName);
-    if (preset) {
-      setFormData({
-        ...formData,
-        name: preset.name,
-        base_url: preset.base_url,
-        model: preset.model,
-        model_display_name: preset.model_display_name,
-        provider: preset.provider,
-        max_tokens: preset.max_tokens,
-        supports_prompt_caching: preset.supports_prompt_caching,
-      });
-    }
-  };
 
   const handleInputChange = (field: keyof DroidProvider, value: string) => {
     setFormData({
@@ -67,139 +35,15 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log("[DroidKeyModal] Submitting formData:", formData);
-    console.log("[DroidKeyModal] Is editing:", !!provider);
-    console.log("[DroidKeyModal] FormData ID:", formData.id);
-    
-    // 如果使用多Key模式，确保至少有一个key
-    if (showMultiKey) {
-      if (formData.name && formData.api_keys && formData.api_keys.length > 0) {
-        // 设置主key为当前激活的key
-        const finalData = {
-          ...formData,
-          api_key: formData.api_keys[formData.current_key_index || 0]?.key || ""
-        };
-        console.log("[DroidKeyModal] Submitting multi-key data:", finalData);
-        onSubmit(finalData);
-      }
-    } else {
-      // 单Key模式
-      if (formData.name && formData.api_key) {
-        // 将单个key转换为api_keys数组
-        const finalData = {
-          ...formData,
-          api_keys: [{
-            id: "1",
-            key: formData.api_key,
-            name: "主Key",
-            is_active: true
-          }],
-          current_key_index: 0,
-          switch_strategy: "manual" as SwitchStrategy
-        };
-        console.log("[DroidKeyModal] Submitting single-key data:", finalData);
-        onSubmit(finalData);
-      }
+    if (formData.api_key) {
+      // 如果名称为空，自动生成默认名称（fk-后六位）
+      const finalData = {
+        ...formData,
+        name: formData.name.trim() || `fk-${formData.api_key.slice(-6)}`
+      };
+      console.log("[DroidKeyModal] Submitting data:", finalData);
+      onSubmit(finalData);
     }
-  };
-  
-  // 处理多Key操作
-  const handleAddKey = (key: ApiKeyInfo) => {
-    const newKeys = [...(formData.api_keys || []), key];
-    setFormData({ ...formData, api_keys: newKeys });
-  };
-
-  const handleRemoveKey = (keyId: string) => {
-    const newKeys = (formData.api_keys || []).filter(k => k.id !== keyId);
-    setFormData({ 
-      ...formData, 
-      api_keys: newKeys,
-      current_key_index: Math.min(formData.current_key_index || 0, newKeys.length - 1)
-    });
-  };
-
-  const handleSelectKey = (index: number) => {
-    setFormData({ ...formData, current_key_index: index });
-  };
-
-  const handleUpdateStrategy = (strategy: SwitchStrategy) => {
-    setFormData({ ...formData, switch_strategy: strategy });
-  };
-
-  const handleRefreshBalances = async () => {
-    // 异步刷新余额，使用函数式更新避免闭包陷阱
-    setFormData(currentFormData => {
-      if (!currentFormData.api_keys || currentFormData.api_keys.length === 0) {
-        return currentFormData;
-      }
-      
-      // 启动异步操作
-      (async () => {
-        try {
-          // 使用当前最新的keys
-          const apiKeysToFetch = currentFormData.api_keys!.map(k => k.key);
-          const balances = await window.api.fetchMultipleDroidBalances(apiKeysToFetch);
-          console.log('Fetched balances:', balances);
-          
-          // 使用函数式更新来保证更新到最新状态
-          setFormData(latestFormData => ({
-            ...latestFormData,
-            api_keys: latestFormData.api_keys!.map((key, index) => {
-              const balanceData = balances[index];
-              if (balanceData && balanceData !== null) {
-                let totalAllowance = 20000000;
-                let totalUsed = 0;
-                
-                if (balanceData.usage && balanceData.usage.standard) {
-                  totalAllowance = balanceData.usage.standard.totalAllowance || 20000000;
-                  totalUsed = balanceData.usage.standard.orgTotalTokensUsed || 0;
-                } else {
-                  totalAllowance = 
-                    balanceData.max_tokens_per_day || 
-                    balanceData.totalAllowance || 
-                    balanceData.quotas?.tokens_per_day ||
-                    20000000;
-                  totalUsed = 
-                    balanceData.tokens_used_today || 
-                    balanceData.totalUsed || 
-                    balanceData.usage?.tokens_today ||
-                    0;
-                }
-                const remaining = totalAllowance - totalUsed;
-                const usedRatio = totalAllowance > 0 ? totalUsed / totalAllowance : 0;
-                
-                return {
-                  ...key,
-                  balance: {
-                    total_allowance: totalAllowance,
-                    total_used: totalUsed,
-                    remaining,
-                    used_ratio: usedRatio,
-                    last_checked: Date.now()
-                  }
-                };
-              } else {
-                return {
-                  ...key,
-                  balance: {
-                    total_allowance: 20000000,
-                    total_used: 0,
-                    remaining: 20000000,
-                    used_ratio: 0,
-                    last_checked: Date.now()
-                  }
-                };
-              }
-            })
-          }));
-        } catch (error) {
-          console.error("Failed to refresh balances:", error);
-        }
-      })();
-      
-      // 立即返回当前状态，不阻塞
-      return currentFormData;
-    });
   };
 
   const isEditing = !!provider;
@@ -237,42 +81,6 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
         {/* Form Content */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
-            {!isEditing && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <Sparkles size={16} className="text-blue-500 dark:text-blue-400" />
-                    配置预设
-                  </h3>
-                </div>
-                <div className="relative">
-                  <select
-                    value={selectedPreset}
-                    onChange={(e) => handlePresetChange(e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
-                  >
-                    <option value="">-- 请选择配置预设 --</option>
-                    {droidProviderPresets.map((preset) => (
-                      <option key={preset.name} value={preset.name}>
-                        {preset.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 pointer-events-none"
-                  />
-                </div>
-                {selectedPreset && (
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
-                    <p className="text-xs text-blue-600 dark:text-blue-400">
-                      已选择预设：<span className="font-medium">{selectedPreset}</span>
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* 基础信息 */}
             <div className="space-y-4">
               <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
@@ -281,130 +89,43 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  名称 <span className="text-red-500">*</span>
+                  名称（可选）
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => handleInputChange("name", e.target.value)}
                   className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
-                  required
-                  placeholder="例如：Droid Production"
+                  placeholder="留空则显示为 fk-后六位"
                 />
               </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    API Key 管理 <span className="text-red-500">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      // 简单切换显示模式，不限制
-                      setShowMultiKey(!showMultiKey);
-                    }}
-                    className="text-xs px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
-                    title="点击切换管理模式"
-                  >
-                    {showMultiKey ? "切换到单Key" : "切换到多Key"}
-                  </button>
-                </div>
-                
-                {showMultiKey ? (
-                  <MultiKeyManager
-                    apiKeys={formData.api_keys || []}
-                    currentKeyIndex={formData.current_key_index || 0}
-                    switchStrategy={formData.switch_strategy || "manual"}
-                    onAddKey={handleAddKey}
-                    onRemoveKey={handleRemoveKey}
-                    onSelectKey={handleSelectKey}
-                    onUpdateStrategy={handleUpdateStrategy}
-                    onRefreshBalances={handleRefreshBalances}
-                  />
-                ) : (
-                  <input
-                    type="password"
-                    value={formData.api_key}
-                    onChange={(e) => handleInputChange("api_key", e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
-                    required={!showMultiKey}
-                    placeholder="fk-..."
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* 高级配置 */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
-                高级配置
-              </h4>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Base URL
+                  API Key <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={formData.base_url}
-                  onChange={(e) => handleInputChange("base_url", e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
-                  placeholder="https://droid2api-2st1n.sevalla.app"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    模型
-                  </label>
+                <div className="relative">
                   <input
-                    type="text"
-                    value={formData.model}
-                    onChange={(e) => handleInputChange("model", e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
-                    placeholder="claude-3-5-sonnet-20241022"
+                    type={showApiKey ? "text" : "password"}
+                    value={formData.api_key}
+                    onChange={(e) => handleInputChange("api_key", e.target.value)}
+                    className="w-full px-3 py-2 pr-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+                    required
+                    placeholder="fk-..."
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    显示名称
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.model_display_name}
-                    onChange={(e) => handleInputChange("model_display_name", e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
-                    placeholder="Sonnet 3.5 [droid]"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors"
+                    aria-label={showApiKey ? "隐藏 API Key" : "显示 API Key"}
+                  >
+                    {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Provider
-              </label>
-              <div className="relative">
-                <select
-                  value={formData.provider}
-                  onChange={(e) => handleInputChange("provider", e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
-                >
-                  <option value="anthropic">anthropic</option>
-                  <option value="openai">openai</option>
-                  <option value="custom">custom</option>
-                </select>
-                <ChevronDown
-                  size={16}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 pointer-events-none"
-                />
-              </div>
-            </div>
+
           </div>
 
           {/* Footer */}

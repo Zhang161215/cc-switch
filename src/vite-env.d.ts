@@ -142,6 +142,9 @@ declare global {
       updateDroidProvider: (provider: DroidProvider) => Promise<boolean>;
       deleteDroidProvider: (id: string) => Promise<boolean>;
       switchDroidProvider: (id: string) => Promise<boolean>;
+      setFactoryApiKeyEnv: (apiKey: string) => Promise<boolean>;
+      getFactoryApiKeyEnv: () => Promise<string | null>;
+      removeFactoryApiKeyEnv: () => Promise<boolean>;
       fetchDroidBalance: (apiKey: string) => Promise<any>;
     fetchMultipleDroidBalances: (apiKeys: string[]) => Promise<any[]>;
     autoSwitchDroidKey: (providerId: string) => Promise<number>;

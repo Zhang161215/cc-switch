@@ -151,4 +151,12 @@ export interface DroidProvider {
   max_tokens?: number;
   supports_prompt_caching?: boolean;
   createdAt?: number;
+  balance?: {
+    total_allowance: number;
+    total_used: number;
+    remaining: number;
+    used_ratio: number;
+    last_checked?: number;
+  }; // 缓存的余额信息
+  is_invalid?: boolean; // 标识账号是否已失效（401错误）
 }
