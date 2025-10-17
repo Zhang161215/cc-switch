@@ -262,6 +262,7 @@
     "title": "MCP 管理",
     "claudeTitle": "Claude Code MCP 管理",
     "codexTitle": "Codex MCP 管理",
+    "droidTitle": "Droid MCP 管理",
     "userLevelPath": "用户级 MCP 配置路径",
     "serverList": "服务器列表",
     "loading": "加载中...",

@@ -12,17 +12,22 @@ on:
         default: '3.5.3'
 
 jobs:
-  build-and-release:
+  # 第一阶段：并行构建所有平台
+  build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false  # 不要因为一个平台失败就停止其他平台
       matrix:
         include:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+            artifact_name: windows
           - os: macos-latest
             target: aarch64-apple-darwin
+            artifact_name: macos
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            artifact_name: linux
 
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +38,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev librsvg2-dev
-            
+
       - uses: pnpm/action-setup@v2
         with:
           version: 8
@@ -73,36 +78,55 @@ jobs:
           fi
           ls -la release-files/
 
-      - name: Remove existing assets if exists
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
+      # 上传构建产物到 GitHub Actions Artifacts
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}-build
+          path: release-files/*
+          retention-days: 1
+          if-no-files-found: error
+
+  # 第二阶段：串行发布所有平台（等待所有构建完成）
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 下载所有构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+
+      - name: 整理发布文件
         run: |
-          for file in release-files/*; do
-            filename=$(basename "$file")
-            gh release delete-asset "${GITHUB_REF#refs/tags/}" "$filename" --yes || true
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          mkdir -p release-files
+          find all-artifacts -type f -exec cp {} release-files/ \;
+          echo "📦 准备发布的文件："
+          ls -la release-files/
 
-      - name: 上传到Release
+      - name: 创建或更新 Release
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
         with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', github.event.inputs.version) || github.ref_name }}
+          name: ${{ github.event_name == 'workflow_dispatch' && format('CC-Switch v{0}', github.event.inputs.version) || format('CC-Switch {0}', github.ref_name) }}
           files: release-files/*
           draft: false
           prerelease: false
+          body: |
+            ## 🎉 CC-Switch 新版本发布
+
+            ### 📦 下载地址
+
+            - **Windows**: CC Switch_*_x64-setup.exe
+            - **macOS**: CC Switch_*_aarch64.dmg
+            - **Linux**: CC Switch_*_amd64.deb 或 CC Switch_*.AppImage
+
+            ### 📝 更新说明
+
+            请查看下方的提交记录了解详细更新内容。
+
+            ---
+
+            **完整更新日志**: https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 手动版本上传
-        uses: softprops/action-gh-release@v1
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          tag_name: v${{ github.event.inputs.version }}
-          name: CC-Switch v${{ github.event.inputs.version }}
-          files: release-files/*
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

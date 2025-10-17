@@ -100,6 +100,7 @@ declare global {
       syncEnabledMcpToCodex: () => Promise<boolean>;
       importMcpFromClaude: () => Promise<number>;
       importMcpFromCodex: () => Promise<number>;
+      importMcpFromDroid: () => Promise<number>;
       // 读取当前生效（live）的 provider settings（根据 appType）
       // Codex: { auth: object, config: string }
       // Claude: settings.json 内容

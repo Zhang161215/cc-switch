@@ -436,6 +436,16 @@ export const tauriAPI = {
     }
   },
 
+  // 从 ~/.factory/mcp.json 导入 MCP（Droid 作用域）
+  importMcpFromDroid: async (): Promise<number> => {
+    try {
+      return await invoke<number>("import_mcp_from_droid");
+    } catch (error) {
+      console.error("从 ~/.factory/mcp.json 导入 MCP 失败:", error);
+      throw error;
+    }
+  },
+
   // 读取当前生效（live）的 provider settings（根据 appType）
   // Codex: { auth: object, config: string }
   // Claude: settings.json 内容

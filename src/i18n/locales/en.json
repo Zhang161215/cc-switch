@@ -262,6 +262,7 @@
     "title": "MCP Management",
     "claudeTitle": "Claude Code MCP Management",
     "codexTitle": "Codex MCP Management",
+    "droidTitle": "Droid MCP Management",
     "userLevelPath": "User-level MCP path",
     "serverList": "Servers",
     "loading": "Loading...",

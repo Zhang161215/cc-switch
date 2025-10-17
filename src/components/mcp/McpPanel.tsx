@@ -53,11 +53,13 @@ const McpPanel: React.FC<McpPanelProps> = ({ onClose, onNotify, appType }) => {
   useEffect(() => {
     const setup = async () => {
       try {
-        // 初始化：仅从对应客户端导入已有 MCP，不做“预设落库”
+        // 初始化：仅从对应客户端导入已有 MCP,不做"预设落库"
         if (appType === "claude") {
           await window.api.importMcpFromClaude();
         } else if (appType === "codex") {
           await window.api.importMcpFromCodex();
+        } else if (appType === "droid") {
+          await window.api.importMcpFromDroid();
         }
       } catch (e) {
         console.warn("MCP 初始化导入失败（忽略继续）", e);
@@ -178,7 +180,11 @@ const McpPanel: React.FC<McpPanelProps> = ({ onClose, onNotify, appType }) => {
   );
 
   const panelTitle =
-    appType === "claude" ? t("mcp.claudeTitle") : t("mcp.codexTitle");
+    appType === "claude"
+      ? t("mcp.claudeTitle")
+      : appType === "droid"
+        ? t("mcp.droidTitle")
+        : t("mcp.codexTitle");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
