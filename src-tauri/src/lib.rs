@@ -4,6 +4,7 @@ mod claude_plugin;
 mod codex_config;
 mod commands;
 mod config;
+mod config_backup;
 mod droid_config;
 mod droid2api_service;
 mod import_export;

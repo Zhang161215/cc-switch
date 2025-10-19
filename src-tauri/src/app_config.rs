@@ -18,7 +18,7 @@ pub struct McpRoot {
     pub codex: McpConfig,
 }
 
-use crate::config::{copy_file, get_app_config_dir, get_app_config_path, write_json_file};
+use crate::config::{copy_file, get_app_config_dir, get_app_config_path};
 use crate::provider::ProviderManager;
 
 /// 应用类型
@@ -83,13 +83,34 @@ impl Default for MultiAppConfig {
 }
 
 impl MultiAppConfig {
-    /// 从文件加载配置（处理v1到v2的迁移）
+    /// 从文件加载配置（处理v1到v2的迁移，带自动恢复）
     pub fn load() -> Result<Self, String> {
         let config_path = get_app_config_path();
 
         if !config_path.exists() {
             log::info!("配置文件不存在，创建新的多应用配置");
             return Ok(Self::default());
+        }
+
+        // 创建备份管理器
+        let backup_manager = crate::config_backup::ConfigBackupManager::new(config_path.clone());
+
+        // 验证配置文件完整性
+        match backup_manager.verify_config() {
+            Ok(true) => {
+                log::info!("✅ 配置文件验证通过");
+            }
+            Ok(false) | Err(_) => {
+                log::warn!("⚠️ 配置文件损坏或格式错误，尝试从备份恢复");
+                
+                // 尝试从最新备份恢复
+                if let Err(e) = backup_manager.restore_from_latest() {
+                    log::error!("❌ 从备份恢复失败: {}，将使用默认配置", e);
+                    return Ok(Self::default());
+                }
+                
+                log::info!("✅ 已从备份成功恢复配置");
+            }
         }
 
         // 尝试读取文件
@@ -138,19 +159,30 @@ impl MultiAppConfig {
         serde_json::from_str::<Self>(&content).map_err(|e| format!("解析配置文件失败: {}", e))
     }
 
-    /// 保存配置到文件
+    /// 保存配置到文件（使用增强的备份机制）
     pub fn save(&self) -> Result<(), String> {
         let config_path = get_app_config_path();
-        // 先备份旧版（若存在）到 ~/.cc-switch/config.json.bak，再写入新内容
-        if config_path.exists() {
-            let backup_path = get_app_config_dir().join("config.json.bak");
-            if let Err(e) = copy_file(&config_path, &backup_path) {
-                log::warn!("备份 config.json 到 .bak 失败: {}", e);
-            }
-        }
-
-        write_json_file(&config_path, self)?;
+        
+        // 使用备份管理器的安全保存功能
+        let backup_manager = crate::config_backup::ConfigBackupManager::new(config_path.clone());
+        backup_manager.safe_save(self)?;
+        
+        log::info!("💾 配置已安全保存并创建备份");
         Ok(())
+    }
+    
+    /// 列出所有可用的配置备份
+    pub fn list_backups() -> Result<Vec<crate::config_backup::BackupMetadata>, String> {
+        let config_path = get_app_config_path();
+        let backup_manager = crate::config_backup::ConfigBackupManager::new(config_path);
+        backup_manager.list_backups()
+    }
+    
+    /// 从指定备份恢复配置
+    pub fn restore_from_backup(backup_path: &str) -> Result<(), String> {
+        let config_path = get_app_config_path();
+        let backup_manager = crate::config_backup::ConfigBackupManager::new(config_path);
+        backup_manager.restore_from_backup(backup_path)
     }
 
     /// 获取指定应用的管理器
