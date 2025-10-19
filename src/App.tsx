@@ -8,7 +8,7 @@ import EditProviderModal from "./components/EditProviderModal";
 import DroidProviderList, { DroidProviderListRef } from "./components/DroidProviderList";
 import DroidKeyModal from "./components/DroidKeyModal";
 import { FactoryEnvDisplay, FactoryEnvDisplayRef } from "./components/FactoryEnvDisplay";
-import FactoryModelsList from "./components/FactoryModelsList";
+import DroidSessionHistory from "./components/DroidSessionHistory";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppSwitcher } from "./components/AppSwitcher";
 import SettingsModal from "./components/SettingsModal";
@@ -484,6 +484,11 @@ function App() {
 
             {activeApp === "droid" ? (
               <>
+                {/* 会话历史按钮 */}
+                <div className="mb-4 flex justify-end">
+                  <DroidSessionHistory onNotify={showNotification} />
+                </div>
+                
                 <DroidProviderList
                   ref={droidProviderListRef}
                   providers={droidProviders}

@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import { 
-  Key, 
   Plus, 
   Trash2, 
   CheckCircle, 
@@ -38,17 +37,6 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [newKeyData, setNewKeyData] = useState({ name: "", key: "" });
   const [refreshing, setRefreshing] = useState(false);
-
-  // 计算汇总信息
-  const totalBalance = apiKeys.reduce((acc, key) => ({
-    totalAllowance: acc.totalAllowance + (key.balance?.total_allowance || 0),
-    totalUsed: acc.totalUsed + (key.balance?.total_used || 0),
-    remaining: acc.remaining + (key.balance?.remaining || 0),
-  }), { totalAllowance: 0, totalUsed: 0, remaining: 0 });
-
-  const averageUsageRatio = apiKeys.length > 0 
-    ? apiKeys.reduce((acc, key) => acc + (key.balance?.used_ratio || 0), 0) / apiKeys.length
-    : 0;
 
   // 格式化数字显示
   const formatNumber = (num: number): string => {

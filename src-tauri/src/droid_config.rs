@@ -1,8 +1,10 @@
 use dirs;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::process::Command;
+use std::time::UNIX_EPOCH;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DroidCustomModel {
@@ -312,4 +314,167 @@ pub fn remove_old_factory_model(old_display_name: &Option<String>) -> Result<(),
         write_factory_config(&config)?;
     }
     Ok(())
+}
+
+/// Droid 会话信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DroidSession {
+    pub id: String,
+    pub title: String,
+    pub timestamp: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_usage: Option<TokenUsage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+}
+
+/// Token 使用量
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenUsage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_tokens: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_tokens: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_creation_tokens: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_read_tokens: Option<i64>,
+}
+
+/// 获取 Factory 会话目录
+fn get_factory_sessions_dir() -> Result<PathBuf, String> {
+    dirs::home_dir()
+        .ok_or_else(|| "无法获取用户主目录".to_string())
+        .map(|home| home.join(".factory").join("sessions"))
+}
+
+/// 获取当前 API key 的 owner
+fn get_current_owner() -> Option<String> {
+    // 直接从 Factory 配置文件中读取，避免调用 droid 命令
+    dirs::home_dir()
+        .and_then(|home| {
+            let settings_path = home.join(".factory").join("settings.json");
+            fs::read_to_string(settings_path).ok()
+        })
+        .and_then(|content| serde_json::from_str::<Value>(&content).ok())
+        .and_then(|settings| {
+            // 尝试从 userId 或 user_id 字段读取
+            settings["userId"]
+                .as_str()
+                .or_else(|| settings["user_id"].as_str())
+                .map(|s| s.to_string())
+        })
+}
+
+/// 读取当前 API key 的 Droid 会话历史
+pub fn read_droid_sessions() -> Result<Vec<DroidSession>, String> {
+    let sessions_dir = get_factory_sessions_dir()?;
+    
+    if !sessions_dir.exists() {
+        return Ok(vec![]);
+    }
+
+    // 获取当前 API key 的 owner（从 Factory 设置中获取）
+    let current_owner = get_current_owner();
+
+    let mut sessions = Vec::new();
+    
+    // 遍历 sessions 目录
+    let entries = fs::read_dir(&sessions_dir)
+        .map_err(|e| format!("读取会话目录失败: {}", e))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
+        let path = entry.path();
+        
+        // 只处理 .jsonl 文件
+        if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+            if let Some(session_id) = path.file_stem().and_then(|s| s.to_str()) {
+                // 读取 .jsonl 文件的第一行获取会话信息
+                if let Ok(content) = fs::read_to_string(&path) {
+                    if let Some(first_line) = content.lines().next() {
+                        if let Ok(session_start) = serde_json::from_str::<Value>(first_line) {
+                            if session_start["type"] == "session_start" {
+                                let title = session_start["title"]
+                                    .as_str()
+                                    .unwrap_or("无标题")
+                                    .to_string();
+                                
+                                let owner = session_start["owner"]
+                                    .as_str()
+                                    .map(|s| s.to_string());
+                                
+                                // 如果无法确定当前 owner，则显示所有会话（兼容模式）
+                                // 如果能确定当前 owner，则只显示匹配的会话
+                                if let Some(current) = &current_owner {
+                                    if let Some(session_owner) = &owner {
+                                        // 如果 owner 不匹配，跳过这个会话
+                                        if session_owner != current {
+                                            continue;
+                                        }
+                                    }
+                                    // 如果会话没有 owner 信息（旧数据），也包含在结果中
+                                }
+                                // 如果 current_owner 是 None，则包含所有会话
+
+                                // 读取对应的 .settings.json 文件获取 token 使用量
+                                let settings_path = path.with_extension("settings.json");
+                                let token_usage = if settings_path.exists() {
+                                    fs::read_to_string(&settings_path)
+                                        .ok()
+                                        .and_then(|content| serde_json::from_str::<Value>(&content).ok())
+                                        .and_then(|settings| {
+                                            let token_usage = settings.get("tokenUsage")?;
+                                            Some(TokenUsage {
+                                                input_tokens: token_usage["inputTokens"].as_i64(),
+                                                output_tokens: token_usage["outputTokens"].as_i64(),
+                                                cache_creation_tokens: token_usage["cacheCreationTokens"].as_i64(),
+                                                cache_read_tokens: token_usage["cacheReadTokens"].as_i64(),
+                                            })
+                                        })
+                                } else {
+                                    None
+                                };
+
+                                // 获取文件修改时间作为时间戳
+                                let timestamp = if let Ok(metadata) = fs::metadata(&path) {
+                                    if let Ok(modified) = metadata.modified() {
+                                        if let Ok(duration) = modified.duration_since(UNIX_EPOCH) {
+                                            // 转换为 ISO 8601 格式
+                                            let secs = duration.as_secs();
+                                            chrono::DateTime::from_timestamp(secs as i64, 0)
+                                                .map(|dt| dt.to_rfc3339())
+                                                .unwrap_or_else(|| duration.as_secs().to_string())
+                                        } else {
+                                            "Unknown".to_string()
+                                        }
+                                    } else {
+                                        "Unknown".to_string()
+                                    }
+                                } else {
+                                    "Unknown".to_string()
+                                };
+
+                                sessions.push(DroidSession {
+                                    id: session_id.to_string(),
+                                    title,
+                                    timestamp,
+                                    owner,
+                                    token_usage,
+                                    file_path: Some(path.to_string_lossy().to_string()),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 按时间戳排序（最新的在前面）
+    sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+    Ok(sessions)
 }

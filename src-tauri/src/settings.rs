@@ -37,10 +37,32 @@ pub struct AppSettings {
     /// Codex 自定义端点列表
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub custom_endpoints_codex: HashMap<String, CustomEndpoint>,
+    /// 默认终端软件（iTerm2 或 Terminal）
+    #[serde(default = "default_terminal")]
+    pub default_terminal: String,
 }
 
 fn default_show_in_tray() -> bool {
     true
+}
+
+fn default_terminal() -> String {
+    // 检查 iTerm2 是否安装，如果安装了默认使用 iTerm2，否则使用 Terminal
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        let check = Command::new("osascript")
+            .args(["-e", r#"tell application "Finder" to exists application file "iTerm.app" of applications folder"#])
+            .output();
+        
+        if let Ok(output) = check {
+            if String::from_utf8_lossy(&output.stdout).trim() == "true" {
+                return "iTerm2".to_string();
+            }
+        }
+    }
+    
+    "Terminal".to_string()
 }
 
 fn default_minimize_to_tray_on_close() -> bool {
@@ -58,6 +80,7 @@ impl Default for AppSettings {
             language: None,
             custom_endpoints_claude: HashMap::new(),
             custom_endpoints_codex: HashMap::new(),
+            default_terminal: "iTerm2".to_string(),
         }
     }
 }

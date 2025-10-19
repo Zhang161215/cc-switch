@@ -53,6 +53,8 @@ export interface Settings {
   customEndpointsClaude?: Record<string, CustomEndpoint>;
   // Codex 自定义端点列表
   customEndpointsCodex?: Record<string, CustomEndpoint>;
+  // 默认终端软件（iTerm2 或 Terminal）
+  defaultTerminal?: string;
 }
 
 // MCP 服务器连接参数（宽松：允许扩展字段）
@@ -159,4 +161,21 @@ export interface DroidProvider {
     last_checked?: number;
   }; // 缓存的余额信息
   is_invalid?: boolean; // 标识账号是否已失效（401错误）
+}
+
+// Droid 会话历史
+export interface TokenUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_tokens?: number;
+  cache_read_tokens?: number;
+}
+
+export interface DroidSession {
+  id: string;
+  title: string;
+  timestamp: string;
+  owner?: string;
+  token_usage?: TokenUsage;
+  file_path?: string;
 }

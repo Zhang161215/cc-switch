@@ -61,6 +61,7 @@ export default function SettingsModal({
     claudeConfigDir: undefined,
     codexConfigDir: undefined,
     language: persistedLanguage,
+    defaultTerminal: "iTerm2",
   });
   const [initialLanguage, setInitialLanguage] = useState<"zh" | "en">(
     persistedLanguage,
@@ -129,6 +130,10 @@ export default function SettingsModal({
           "boolean"
             ? (loadedSettings as any).enableClaudePluginIntegration
             : false,
+        defaultTerminal:
+          typeof (loadedSettings as any)?.defaultTerminal === "string"
+            ? (loadedSettings as any).defaultTerminal
+            : "iTerm2",
         claudeConfigDir:
           typeof (loadedSettings as any)?.claudeConfigDir === "string"
             ? (loadedSettings as any).claudeConfigDir
@@ -548,6 +553,63 @@ export default function SettingsModal({
                   className="w-4 h-4 text-blue-500 rounded focus:ring-blue-500/20"
                 />
               </label>
+            </div>
+          </div>
+
+          {/* 默认终端选择 (macOS only) */}
+          {!isLinux() && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+                默认终端
+              </h3>
+              <div className="space-y-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  选择打开 Droid 会话时使用的终端软件
+                </p>
+                <div className="inline-flex p-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSettings((prev) => ({
+                        ...prev,
+                        defaultTerminal: "iTerm2",
+                      }))
+                    }
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all min-w-[80px] ${
+                      (settings.defaultTerminal || "iTerm2") === "iTerm2"
+                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm"
+                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    iTerm2
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSettings((prev) => ({
+                        ...prev,
+                        defaultTerminal: "Terminal",
+                      }))
+                    }
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all min-w-[80px] ${
+                      settings.defaultTerminal === "Terminal"
+                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm"
+                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    Terminal
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Claude 插件联动设置 */}
+          <div>
+            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+              Claude 插件联动
+            </h3>
+            <div className="space-y-3">
               {/* Claude 插件联动开关 */}
               <label className="flex items-center justify-between">
                 <div>

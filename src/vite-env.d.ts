@@ -152,6 +152,12 @@ declare global {
     getFactoryCustomModels: () => Promise<any[]>;
     deleteFactoryCustomModel: (modelDisplayName: string) => Promise<void>;
     updateFactoryCustomModel: (oldDisplayName: string, model: any) => Promise<void>;
+    // Droid 会话历史管理
+    getDroidSessions: () => Promise<import("./types").DroidSession[]>;
+    getDroidSessionCommand: (sessionId: string, workingDir?: string) => Promise<string>;
+    copyToClipboard: (text: string) => Promise<void>;
+    openDroidInTerminal: (sessionId: string, workingDir?: string) => Promise<void>;
+    deleteDroidSession: (sessionId: string) => Promise<void>;
     };
     platform: {
       isMac: boolean;

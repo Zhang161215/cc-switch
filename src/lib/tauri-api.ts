@@ -783,6 +783,61 @@ export const tauriAPI = {
     }
   },
 
+  // Droid 会话历史管理
+  getDroidSessions: async (): Promise<import("../types").DroidSession[]> => {
+    try {
+      return await invoke("get_droid_sessions");
+    } catch (error) {
+      console.error("获取 Droid 会话历史失败:", error);
+      throw error;
+    }
+  },
+
+  getDroidSessionCommand: async (
+    sessionId: string,
+    workingDir?: string,
+  ): Promise<string> => {
+    try {
+      return await invoke("get_droid_session_command", {
+        sessionId,
+        workingDir,
+      });
+    } catch (error) {
+      console.error("获取 Droid 会话命令失败:", error);
+      throw error;
+    }
+  },
+
+  copyToClipboard: async (text: string): Promise<void> => {
+    try {
+      await invoke("copy_to_clipboard", { text });
+    } catch (error) {
+      console.error("复制到剪贴板失败:", error);
+      throw error;
+    }
+  },
+
+  openDroidInTerminal: async (
+    sessionId: string,
+    workingDir?: string,
+  ): Promise<void> => {
+    try {
+      await invoke("open_droid_in_terminal", { sessionId, workingDir });
+    } catch (error) {
+      console.error("打开终端失败:", error);
+      throw error;
+    }
+  },
+
+  deleteDroidSession: async (sessionId: string): Promise<void> => {
+    try {
+      await invoke("delete_droid_session", { sessionId });
+    } catch (error) {
+      console.error("删除会话失败:", error);
+      throw error;
+    }
+  },
+
   // 监听供应商切换事件
   onProviderSwitched: async (
     callback: (data: { appType: string; providerId: string }) => void,

@@ -1893,3 +1893,178 @@ pub async fn remove_factory_api_key_env() -> Result<bool, String> {
     
     Ok(removed)
 }
+
+/// 获取 Droid 会话历史列表
+#[tauri::command]
+pub async fn get_droid_sessions() -> Result<Vec<crate::droid_config::DroidSession>, String> {
+    crate::droid_config::read_droid_sessions()
+}
+
+/// 获取会话 ID（用于复制）
+#[tauri::command]
+pub async fn get_droid_session_command(session_id: String, working_dir: Option<String>) -> Result<String, String> {
+    // 只返回 session ID，方便用户复制
+    Ok(session_id)
+}
+
+/// 复制文本到剪贴板（后端实现，避免前端权限问题）
+#[tauri::command]
+pub async fn copy_to_clipboard(app: tauri::AppHandle, text: String) -> Result<(), String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    
+    app.clipboard()
+        .write_text(text)
+        .map_err(|e| format!("复制到剪贴板失败: {}", e))
+}
+
+/// 删除 Droid 会话及其相关文件
+#[tauri::command]
+pub async fn delete_droid_session(session_id: String) -> Result<(), String> {
+    use std::fs;
+    use std::path::PathBuf;
+    
+    // 获取会话文件路径
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| "无法获取用户主目录".to_string())?;
+    
+    let sessions_dir = home_dir.join(".factory").join("sessions");
+    
+    // 删除 .jsonl 文件
+    let jsonl_file = sessions_dir.join(format!("{}.jsonl", session_id));
+    if jsonl_file.exists() {
+        fs::remove_file(&jsonl_file)
+            .map_err(|e| format!("删除会话日志文件失败: {}", e))?;
+        println!("[delete_droid_session] 已删除: {:?}", jsonl_file);
+    }
+    
+    // 删除 .settings.json 文件
+    let settings_file = sessions_dir.join(format!("{}.settings.json", session_id));
+    if settings_file.exists() {
+        fs::remove_file(&settings_file)
+            .map_err(|e| format!("删除会话设置文件失败: {}", e))?;
+        println!("[delete_droid_session] 已删除: {:?}", settings_file);
+    }
+    
+    Ok(())
+}
+
+/// 在终端中打开 Droid 交互模式并执行 /sessions（macOS）
+#[tauri::command]
+pub async fn open_droid_in_terminal(session_id: String, working_dir: Option<String>) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        
+        // 读取用户的终端偏好设置
+        let settings = crate::settings::get_settings();
+        let preferred_terminal = &settings.default_terminal;
+        
+        println!("[open_droid_in_terminal] 选择的终端: {}", preferred_terminal);
+        
+        // 执行 droid /sessions 命令
+        let cmd = if let Some(dir) = working_dir {
+            format!("cd '{}' && droid /sessions", dir)
+        } else {
+            format!("droid /sessions")
+        };
+        
+        println!("[open_droid_in_terminal] 要执行的命令: {}", cmd);
+        
+        // 根据设置选择终端 - 确保只执行一个
+        if preferred_terminal == "iTerm2" {
+            println!("[open_droid_in_terminal] 尝试使用 iTerm2");
+            
+            // 使用 iTerm2 - 统一处理，避免 current window 错误
+            let iterm_script = format!(
+                r#"tell application "iTerm"
+    activate
+    
+    -- 尝试获取当前窗口，如果失败则创建新窗口
+    try
+        set currentWin to current window
+        -- 如果成功获取到窗口，创建新tab
+        tell currentWin
+            create tab with default profile
+            tell current session
+                write text "{}"
+            end tell
+        end tell
+    on error
+        -- 如果失败（没有窗口或窗口不可用），创建新窗口
+        set newWindow to (create window with default profile)
+        tell current session of newWindow
+            write text "{}"
+        end tell
+    end try
+end tell"#,
+                cmd, cmd
+            );
+            
+            let result = Command::new("osascript")
+                .args(["-e", &iterm_script])
+                .output();
+            
+            match result {
+                Ok(output) => {
+                    if output.status.success() {
+                        println!("[open_droid_in_terminal] iTerm2 成功执行");
+                        return Ok(());
+                    } else {
+                        let error = String::from_utf8_lossy(&output.stderr);
+                        println!("[open_droid_in_terminal] iTerm2 执行失败: {}", error);
+                        // 继续降级到 Terminal
+                    }
+                }
+                Err(e) => {
+                    println!("[open_droid_in_terminal] iTerm2 命令执行错误: {}", e);
+                    // 继续降级到 Terminal
+                }
+            }
+        }
+        
+        // 使用 Terminal.app（当选择Terminal或iTerm2失败时）
+        println!("[open_droid_in_terminal] 使用 Terminal.app");
+        
+        // Terminal.app 特殊处理：不使用 do script，改用 System Events
+        let terminal_script = format!(
+            r#"tell application "Terminal"
+    activate
+    
+    if (count of windows) > 0 then
+        -- 有窗口时，用 System Events 创建新标签页并输入命令
+        tell application "System Events"
+            keystroke "t" using command down
+            delay 0.5
+            keystroke "{}"
+            keystroke return
+        end tell
+    else
+        -- 没有窗口时创建新窗口
+        do script "{}"
+    end if
+end tell"#,
+            cmd.replace("\"", "\\\""), cmd
+        );
+        
+        let result = Command::new("osascript")
+            .args(["-e", &terminal_script])
+            .output();
+            
+        match result {
+            Ok(output) if output.status.success() => {
+                println!("[open_droid_in_terminal] Terminal 成功执行");
+                Ok(())
+            }
+            Ok(output) => {
+                let error = String::from_utf8_lossy(&output.stderr);
+                Err(format!("Terminal 执行失败: {}", error))
+            }
+            Err(e) => Err(format!("打开终端失败: {}", e))
+        }
+    }
+    
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("当前平台不支持自动打开终端".to_string())
+    }
+}

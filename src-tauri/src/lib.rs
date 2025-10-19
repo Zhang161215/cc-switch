@@ -306,6 +306,8 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             // 注册 Updater 插件（桌面端）
             #[cfg(desktop)]
@@ -467,6 +469,12 @@ pub fn run() {
             commands::set_factory_api_key_env,
             commands::get_factory_api_key_env,
             commands::remove_factory_api_key_env,
+            // Droid session history management
+            commands::get_droid_sessions,
+            commands::get_droid_session_command,
+            commands::copy_to_clipboard,
+            commands::open_droid_in_terminal,
+            commands::delete_droid_session,
             // theirs: config import/export and dialogs
             import_export::export_config_to_file,
             import_export::import_config_from_file,
