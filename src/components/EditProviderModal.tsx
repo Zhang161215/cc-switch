@@ -46,8 +46,10 @@ const EditProviderModal: React.FC<EditProviderModalProps> = ({
   }, [appType, provider]);
 
   const handleSubmit = (data: Omit<Provider, "id">) => {
+    // 只传递 id 和表单数据，不包含旧的 meta
+    // 让后端使用内存中的最新 meta（已通过 removeCustomEndpoint 等 API 更新）
     onSave({
-      ...provider,
+      id: provider.id,
       ...data,
     });
   };
