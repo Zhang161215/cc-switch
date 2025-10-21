@@ -615,10 +615,8 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
       ...(category ? { category } : {}),
     };
 
-    // 若为"新建供应商"，将端点候选一并随提交落盘到 meta.custom_endpoints：
-    // - 用户在弹窗中新增的自定义端点（draftCustomEndpoints，已去重）
-    // - 预设中的 endpointCandidates（若存在）
-    // - 当前选中的基础 URL（baseUrl/codexBaseUrl）
+    // 若为"新建供应商"，将用户自定义的端点保存到 meta.custom_endpoints
+    // 只保存用户在端点管理弹窗中新增的自定义端点，不包含预设的默认端点
     if (!initialData) {
       const urlSet = new Set<string>();
       const push = (raw?: string) => {
@@ -629,32 +627,10 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
       // 自定义端点（仅来自用户新增）
       for (const u of draftCustomEndpoints) push(u);
 
-      // 预设端点候选
+      // 当前使用的基础 URL（如果不在自定义端点中，也保存）
       if (!isCodex) {
-        if (
-          selectedPreset !== null &&
-          selectedPreset >= 0 &&
-          selectedPreset < providerPresets.length
-        ) {
-          const preset = providerPresets[selectedPreset] as any;
-          if (Array.isArray(preset?.endpointCandidates)) {
-            for (const u of preset.endpointCandidates as string[]) push(u);
-          }
-        }
-        // 当前 Claude 基础地址
         push(baseUrl);
       } else {
-        if (
-          selectedCodexPreset !== null &&
-          selectedCodexPreset >= 0 &&
-          selectedCodexPreset < codexProviderPresets.length
-        ) {
-          const preset = codexProviderPresets[selectedCodexPreset] as any;
-          if (Array.isArray(preset?.endpointCandidates)) {
-            for (const u of preset.endpointCandidates as string[]) push(u);
-          }
-        }
-        // 当前 Codex 基础地址
         push(codexBaseUrl);
       }
 
@@ -1205,7 +1181,10 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
       }
     }
 
+    // 只有在新建模式（无 initialData）且选择了预设时，才添加预设的端点候选
+    // 编辑模式下不再自动添加预设端点，避免用户删除后又重新出现
     if (
+      !initialData &&
       selectedPreset !== null &&
       selectedPreset >= 0 &&
       selectedPreset < providerPresets.length
@@ -1247,7 +1226,10 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
       add(existing);
     }
 
+    // 只有在新建模式（无 initialData）且选择了预设时，才添加预设的端点候选
+    // 编辑模式下不再自动添加预设端点，避免用户删除后又重新出现
     if (
+      !initialData &&
       selectedCodexPreset !== null &&
       selectedCodexPreset >= 0 &&
       selectedCodexPreset < codexProviderPresets.length
