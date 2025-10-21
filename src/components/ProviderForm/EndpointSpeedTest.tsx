@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Zap, Loader2, Plus, X, AlertCircle, Save } from "lucide-react";
 import { isLinux } from "../../lib/platform";
@@ -84,6 +84,10 @@ const EndpointSpeedTest: React.FC<EndpointSpeedTestProps> = ({
   const [autoSelect, setAutoSelect] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
+  
+  // 使用 ref 来跟踪是否已经初始化过 initialEndpoints
+  // 每次组件重新挂载时会重置，确保新的编辑会话能正确初始化
+  const hasInitializedEndpoints = useRef(false);
 
   const normalizedSelected = normalizeEndpointUrl(value);
 
@@ -166,8 +170,13 @@ const EndpointSpeedTest: React.FC<EndpointSpeedTestProps> = ({
         changed = true;
       };
 
-      initialEndpoints.forEach(mergeCandidate);
+      // 只在首次初始化时合并 initialEndpoints，避免删除的端点重新出现
+      if (!hasInitializedEndpoints.current) {
+        initialEndpoints.forEach(mergeCandidate);
+        hasInitializedEndpoints.current = true;
+      }
 
+      // 始终确保当前选中的 URL 在列表中
       if (normalizedSelected && !map.has(normalizedSelected)) {
         mergeCandidate({ url: normalizedSelected, isCustom: true });
       }
