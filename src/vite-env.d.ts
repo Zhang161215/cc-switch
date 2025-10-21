@@ -149,6 +149,8 @@ declare global {
       fetchDroidBalance: (apiKey: string) => Promise<any>;
     fetchMultipleDroidBalances: (apiKeys: string[]) => Promise<any[]>;
     autoSwitchDroidKey: (providerId: string) => Promise<number>;
+    getFactoryConfig: () => Promise<import("./types").DroidConfig>;
+    saveFactoryConfig: (config: import("./types").DroidConfig) => Promise<void>;
     getFactoryCustomModels: () => Promise<any[]>;
     deleteFactoryCustomModel: (modelDisplayName: string) => Promise<void>;
     updateFactoryCustomModel: (oldDisplayName: string, model: any) => Promise<void>;

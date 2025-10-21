@@ -753,6 +753,26 @@ export const tauriAPI = {
     }
   },
 
+  // 获取完整的 Factory 配置
+  getFactoryConfig: async (): Promise<any> => {
+    try {
+      return await invoke("get_factory_config");
+    } catch (error) {
+      console.error("获取 Factory 配置失败:", error);
+      throw error;
+    }
+  },
+
+  // 保存完整的 Factory 配置
+  saveFactoryConfig: async (config: any): Promise<void> => {
+    try {
+      await invoke("save_factory_config", { config });
+    } catch (error) {
+      console.error("保存 Factory 配置失败:", error);
+      throw error;
+    }
+  },
+
   // 获取 Factory 配置中的自定义模型
   getFactoryCustomModels: async (): Promise<any[]> => {
     try {

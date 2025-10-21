@@ -9,6 +9,7 @@ import DroidProviderList, { DroidProviderListRef } from "./components/DroidProvi
 import DroidKeyModal from "./components/DroidKeyModal";
 import { FactoryEnvDisplay, FactoryEnvDisplayRef } from "./components/FactoryEnvDisplay";
 import DroidSessionHistory from "./components/DroidSessionHistory";
+import FactoryConfigEditor from "./components/FactoryConfigEditor";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppSwitcher } from "./components/AppSwitcher";
 import SettingsModal from "./components/SettingsModal";
@@ -537,6 +538,7 @@ function App() {
                   onNotify={showNotification}
                 />
                 <FactoryEnvDisplay ref={factoryEnvRef} currentProviderId={currentDroidProviderId} />
+                <FactoryConfigEditor onNotify={showNotification} />
               </>
             ) : (
               <ProviderList

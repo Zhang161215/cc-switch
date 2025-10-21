@@ -1656,6 +1656,18 @@ pub async fn auto_switch_droid_key(
     Err("Provider not found".to_string())
 }
 
+/// 获取完整的 Factory 配置
+#[tauri::command]
+pub async fn get_factory_config() -> Result<crate::droid_config::DroidConfig, String> {
+    crate::droid_config::read_factory_config()
+}
+
+/// 保存完整的 Factory 配置
+#[tauri::command]
+pub async fn save_factory_config(config: crate::droid_config::DroidConfig) -> Result<(), String> {
+    crate::droid_config::write_factory_config(&config)
+}
+
 /// 获取 Factory 配置中的自定义模型
 #[tauri::command]
 pub async fn get_factory_custom_models() -> Result<Vec<crate::droid_config::DroidCustomModel>, String> {

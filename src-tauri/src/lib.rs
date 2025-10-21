@@ -464,6 +464,8 @@ pub fn run() {
             commands::fetch_droid_balance,
             commands::fetch_multiple_droid_balances,
             commands::auto_switch_droid_key,
+            commands::get_factory_config,
+            commands::save_factory_config,
             commands::get_factory_custom_models,
             commands::delete_factory_custom_model,
             commands::update_factory_custom_model,
