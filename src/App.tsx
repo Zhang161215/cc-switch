@@ -331,9 +331,46 @@ function App() {
       await loadDroidProviders();
       setIsDroidKeyModalOpen(false);
       showNotification("Droid Key 添加成功", "success", 2000);
+
+      // 添加成功后自动查询余额
+      setTimeout(() => {
+        if (droidProviderListRef.current) {
+          droidProviderListRef.current.fetchBalance(newProvider.id);
+        }
+      }, 500);
     } catch (error) {
       console.error("添加 Droid Key 失败:", error);
       showNotification("添加失败", "error");
+    }
+  };
+
+  // 批量添加 Droid Provider
+  const handleBatchAddDroidProviders = async (providers: DroidProvider[]) => {
+    try {
+      const addedProviderIds: string[] = [];
+      for (const provider of providers) {
+        const newProvider = {
+          ...provider,
+          id: generateId(),
+          createdAt: Date.now(),
+        };
+        await window.api.addDroidProvider(newProvider);
+        addedProviderIds.push(newProvider.id);
+      }
+      await loadDroidProviders();
+      showNotification(`成功添加 ${addedProviderIds.length} 个 Droid Key`, "success", 2000);
+
+      // 批量添加成功后自动查询所有新增 Key 的余额
+      setTimeout(() => {
+        if (droidProviderListRef.current) {
+          addedProviderIds.forEach(id => {
+            droidProviderListRef.current?.fetchBalance(id);
+          });
+        }
+      }, 500);
+    } catch (error) {
+      console.error("批量添加 Droid Key 失败:", error);
+      showNotification("批量添加失败", "error");
     }
   };
 
@@ -561,9 +598,10 @@ function App() {
       {isDroidKeyModalOpen && (
         <DroidKeyModal
           provider={editingDroidProvider || undefined}
-          onSubmit={editingDroidProvider 
-            ? (provider) => handleUpdateDroidProvider(provider, false) 
+          onSubmit={editingDroidProvider
+            ? (provider) => handleUpdateDroidProvider(provider, false)
             : handleAddDroidProvider}
+          onBatchSubmit={editingDroidProvider ? undefined : handleBatchAddDroidProviders}
           onClose={() => {
             setIsDroidKeyModalOpen(false);
             setEditingDroidProvider(null);
