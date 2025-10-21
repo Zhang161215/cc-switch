@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Settings, ChevronDown, ChevronUp, Edit3, Trash2, Plus, Save, X } from "lucide-react";
+import { Settings, ChevronDown, ChevronUp, Edit3, Trash2, Plus, Save, X, Eye, EyeOff } from "lucide-react";
 import { DroidConfig, DroidCustomModel } from "../types";
 import { isLinux } from "../lib/platform";
 
@@ -14,6 +14,7 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
   const [editingModel, setEditingModel] = useState<DroidCustomModel | null>(null);
   const [editingIndex, setEditingIndex] = useState<number>(-1);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
 
   // 加载配置
   const loadConfig = async () => {
@@ -145,10 +146,10 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
             <div className="flex justify-end">
               <button
                 onClick={handleAddModel}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors text-sm font-medium"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors text-xs font-medium"
               >
-                <Plus className="h-4 w-4" />
-                添加自定义模型
+                <Plus className="h-3.5 w-3.5" />
+                添加模型
               </button>
             </div>
 
@@ -304,15 +305,28 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
                 <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
                   API Key <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="password"
-                  value={editingModel.api_key}
-                  onChange={(e) =>
-                    setEditingModel({ ...editingModel, api_key: e.target.value })
-                  }
-                  placeholder="sk-ant-..."
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
+                <div className="relative">
+                  <input
+                    type={showApiKey ? "text" : "password"}
+                    value={editingModel.api_key}
+                    onChange={(e) =>
+                      setEditingModel({ ...editingModel, api_key: e.target.value })
+                    }
+                    placeholder="sk-ant-..."
+                    autoComplete="off"
+                    className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  {editingModel.api_key && (
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                      aria-label={showApiKey ? "隐藏 API Key" : "显示 API Key"}
+                    >
+                      {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* max_tokens */}
