@@ -130,47 +130,48 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path release-assets | Out-Null
           $VERSION = $env:GITHUB_REF_NAME
           
-          # MSI 安装包
-          $msi = Get-ChildItem -Path 'src-tauri/target' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($null -ne $msi) {
-            $dest = "CC-Switch-$VERSION-Windows.msi"
-            Copy-Item $msi.FullName (Join-Path release-assets $dest)
-            Write-Host "✅ Windows MSI copied: $dest"
-          } else {
-            Write-Error "❌ No Windows MSI found"
+          Write-Host "🔍 查找 Windows 可执行文件..."
+          
+          # 只构建免安装版 exe
+          $exeCandidates = @(
+            'src-tauri/target/x86_64-pc-windows-msvc/release/cc-switch.exe',
+            'src-tauri/target/release/cc-switch.exe'
+          )
+          
+          $exePath = $null
+          foreach ($candidate in $exeCandidates) {
+            Write-Host "检查: $candidate"
+            if (Test-Path $candidate) {
+              $exePath = $candidate
+              Write-Host "✅ 找到: $candidate"
+              break
+            }
+          }
+          
+          if ($null -eq $exePath) {
+            Write-Host "❌ 未找到可执行文件，列出构建目录内容..."
+            Get-ChildItem -Path 'src-tauri/target' -Recurse -Include *.exe | ForEach-Object { Write-Host $_.FullName }
             exit 1
           }
           
-          # NSIS 安装包
-          $exe = Get-ChildItem -Path 'src-tauri/target' -Recurse -Include *.exe -ErrorAction SilentlyContinue | 
-                 Where-Object { $_.Directory.Name -eq 'nsis' } | Select-Object -First 1
-          if ($null -ne $exe) {
-            $dest = "CC-Switch-$VERSION-Windows-setup.exe"
-            Copy-Item $exe.FullName (Join-Path release-assets $dest)
-            Write-Host "✅ Windows NSIS copied: $dest"
-          }
+          # 创建免安装版 zip
+          $portableDir = 'release-assets/CC-Switch-Portable'
+          New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
+          Copy-Item $exePath $portableDir
           
-          # Portable 绿色版
-          $exeCandidates = @(
-            'src-tauri/target/release/cc-switch.exe',
-            'src-tauri/target/x86_64-pc-windows-msvc/release/cc-switch.exe'
-          )
-          $exePath = $exeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if ($null -ne $exePath) {
-            $portableDir = 'release-assets/CC-Switch-Portable'
-            New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
-            Copy-Item $exePath $portableDir
-            $portableIniPath = Join-Path $portableDir 'portable.ini'
-            @('# CC Switch portable build marker', 'portable=true') | Set-Content -Path $portableIniPath -Encoding UTF8
-            $portableZip = "release-assets/CC-Switch-$VERSION-Windows-Portable.zip"
-            Compress-Archive -Path "$portableDir/*" -DestinationPath $portableZip -Force
-            Remove-Item -Recurse -Force $portableDir
-            Write-Host "✅ Windows portable ZIP created: CC-Switch-$VERSION-Windows-Portable.zip"
-          }
+          # 添加 portable.ini 标记文件
+          $portableIniPath = Join-Path $portableDir 'portable.ini'
+          @('# CC Switch portable build marker', 'portable=true') | Set-Content -Path $portableIniPath -Encoding UTF8
+          
+          # 打包为 zip
+          $portableZip = "release-assets/CC-Switch-$VERSION-Windows.zip"
+          Compress-Archive -Path "$portableDir/*" -DestinationPath $portableZip -Force
+          Remove-Item -Recurse -Force $portableDir
+          
+          Write-Host "✅ Windows 免安装版已创建: CC-Switch-$VERSION-Windows.zip"
 
       - name: Prepare Linux Assets
         if: runner.os == 'Linux'
@@ -219,8 +220,7 @@ jobs:
             ### 📦 下载地址
 
             #### Windows
-            - **安装版**: `CC-Switch-${{ github.ref_name }}-Windows.msi` 或 `CC-Switch-${{ github.ref_name }}-Windows-setup.exe`
-            - **绿色版**: `CC-Switch-${{ github.ref_name }}-Windows-Portable.zip`（解压即用）
+            - **免安装版**: `CC-Switch-${{ github.ref_name }}-Windows.zip`（解压即用，无需安装）
 
             #### macOS
             - **DMG 安装包**: `CC-Switch-${{ github.ref_name }}-macOS.dmg`
