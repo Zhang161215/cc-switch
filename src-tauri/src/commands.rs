@@ -1709,7 +1709,10 @@ pub async fn set_factory_api_key_env(api_key: String) -> Result<bool, String> {
     use std::fs;
     use std::io::{Read, Write};
     
+    println!("[DEBUG] 开始设置 FACTORY_API_KEY 环境变量...");
+    
     let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
+    println!("[DEBUG] 用户主目录: {}", home_dir.display());
     
     #[cfg(windows)]
     {
@@ -1721,6 +1724,11 @@ pub async fn set_factory_api_key_env(api_key: String) -> Result<bool, String> {
             home_dir.join("Documents").join("WindowsPowerShell").join("Microsoft.PowerShell_profile.ps1"),
         ];
         
+        println!("[DEBUG] PowerShell 配置文件候选:");
+        for (i, p) in ps_configs.iter().enumerate() {
+            println!("[DEBUG]   {}. {} (存在: {})", i+1, p.display(), p.exists());
+        }
+        
         // 选择第一个存在的配置文件，如果都不存在则创建 PowerShell Core 的
         let config_file = ps_configs
             .iter()
@@ -1728,19 +1736,40 @@ pub async fn set_factory_api_key_env(api_key: String) -> Result<bool, String> {
             .unwrap_or(&ps_configs[0])
             .clone();
         
+        println!("[DEBUG] 选择的配置文件: {}", config_file.display());
+        
         // 确保目录存在
         if let Some(parent) = config_file.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("无法创建 PowerShell 配置目录: {}", e))?;
+            println!("[DEBUG] 创建目录: {}", parent.display());
+            match fs::create_dir_all(parent) {
+                Ok(_) => println!("[DEBUG] ✓ 目录创建成功"),
+                Err(e) => {
+                    let err_msg = format!("无法创建 PowerShell 配置目录 {}: {}", parent.display(), e);
+                    println!("[ERROR] {}", err_msg);
+                    return Err(err_msg);
+                }
+            }
         }
         
         // 读取现有内容
         let mut content = String::new();
         if config_file.exists() {
+            println!("[DEBUG] 读取现有配置文件...");
             let mut file = fs::File::open(&config_file)
-                .map_err(|e| format!("无法读取配置文件: {}", e))?;
+                .map_err(|e| {
+                    let err_msg = format!("无法读取配置文件 {}: {}", config_file.display(), e);
+                    println!("[ERROR] {}", err_msg);
+                    err_msg
+                })?;
             file.read_to_string(&mut content)
-                .map_err(|e| format!("无法读取配置文件内容: {}", e))?;
+                .map_err(|e| {
+                    let err_msg = format!("无法读取配置文件内容: {}", e);
+                    println!("[ERROR] {}", err_msg);
+                    err_msg
+                })?;
+            println!("[DEBUG] 现有内容长度: {} 字节", content.len());
+        } else {
+            println!("[DEBUG] 配置文件不存在，将创建新文件");
         }
         
         // PowerShell 语法
@@ -1748,14 +1777,18 @@ pub async fn set_factory_api_key_env(api_key: String) -> Result<bool, String> {
         let marker_start = "# CC-Switch Droid Config - Start";
         let marker_end = "# CC-Switch Droid Config - End";
         
+        println!("[DEBUG] 处理配置内容...");
+        
         // 移除旧的配置块（如果存在）
         let lines: Vec<&str> = content.lines().collect();
         let mut new_lines = Vec::new();
         let mut skip = false;
+        let mut removed_old_config = false;
         
         for line in lines {
             if line.contains(marker_start) {
                 skip = true;
+                removed_old_config = true;
                 continue;
             }
             if line.contains(marker_end) {
@@ -1767,6 +1800,10 @@ pub async fn set_factory_api_key_env(api_key: String) -> Result<bool, String> {
             }
         }
         
+        if removed_old_config {
+            println!("[DEBUG] 已移除旧的 CC-Switch 配置");
+        }
+        
         // 添加新的配置块
         new_lines.push("");
         new_lines.push(marker_start);
@@ -1775,15 +1812,43 @@ pub async fn set_factory_api_key_env(api_key: String) -> Result<bool, String> {
         
         let new_content = new_lines.join("\r\n") + "\r\n"; // Windows 使用 CRLF
         
+        println!("[DEBUG] 新内容长度: {} 字节", new_content.len());
+        println!("[DEBUG] 写入文件: {}", config_file.display());
+        
         // 写入文件
         let mut file = fs::File::create(&config_file)
-            .map_err(|e| format!("无法写入配置文件: {}", e))?;
+            .map_err(|e| {
+                let err_msg = format!("无法创建/写入配置文件 {}: {}", config_file.display(), e);
+                println!("[ERROR] {}", err_msg);
+                err_msg
+            })?;
+        
         file.write_all(new_content.as_bytes())
-            .map_err(|e| format!("无法写入配置: {}", e))?;
+            .map_err(|e| {
+                let err_msg = format!("无法写入配置内容: {}", e);
+                println!("[ERROR] {}", err_msg);
+                err_msg
+            })?;
         
-        println!("✓ FACTORY_API_KEY 已写入 {}", config_file.display());
-        println!("✓ 请重新打开 PowerShell 窗口以使配置生效");
+        // 确保数据写入磁盘
+        file.sync_all()
+            .map_err(|e| {
+                let err_msg = format!("无法同步文件到磁盘: {}", e);
+                println!("[ERROR] {}", err_msg);
+                err_msg
+            })?;
         
+        println!("[SUCCESS] ✓ FACTORY_API_KEY 已写入 {}", config_file.display());
+        println!("[INFO] ✓ 请重新打开 PowerShell 窗口以使配置生效");
+        
+        // 验证文件是否真的创建成功
+        if !config_file.exists() {
+            let err_msg = format!("配置文件写入后仍不存在: {}", config_file.display());
+            println!("[ERROR] {}", err_msg);
+            return Err(err_msg);
+        }
+        
+        println!("[DEBUG] 验证通过，文件已成功创建");
         Ok(true)
     }
     
