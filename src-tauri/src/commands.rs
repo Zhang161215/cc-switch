@@ -1711,177 +1711,51 @@ pub async fn set_factory_api_key_env(api_key: String) -> Result<bool, String> {
     
     let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
     
-    // 尝试按优先级查找 shell 配置文件
-    let shell_configs = vec![
-        home_dir.join(".zshrc"),
-        home_dir.join(".bash_profile"),
-        home_dir.join(".bashrc"),
-    ];
-    
-    let config_file = shell_configs
-        .iter()
-        .find(|p| p.exists())
-        .or(shell_configs.first())
-        .ok_or("无法找到 shell 配置文件")?;
-    
-    // 读取现有内容
-    let mut content = String::new();
-    if config_file.exists() {
-        let mut file = fs::File::open(config_file)
-            .map_err(|e| format!("无法读取配置文件: {}", e))?;
-        file.read_to_string(&mut content)
-            .map_err(|e| format!("无法读取配置文件内容: {}", e))?;
-    }
-    
-    // 检查是否已存在 FACTORY_API_KEY 配置
-    let export_line = format!("export FACTORY_API_KEY=\"{}\"", api_key);
-    let marker_start = "# CC-Switch Droid Config - Start";
-    let marker_end = "# CC-Switch Droid Config - End";
-    
-    // 移除旧的配置块（如果存在）
-    let lines: Vec<&str> = content.lines().collect();
-    let mut new_lines = Vec::new();
-    let mut skip = false;
-    
-    for line in lines {
-        if line.contains(marker_start) {
-            skip = true;
-            continue;
-        }
-        if line.contains(marker_end) {
-            skip = false;
-            continue;
-        }
-        if !skip {
-            new_lines.push(line);
-        }
-    }
-    
-    // 添加新的配置块
-    new_lines.push("");
-    new_lines.push(marker_start);
-    new_lines.push(&export_line);
-    new_lines.push(marker_end);
-    
-    let new_content = new_lines.join("\n") + "\n";
-    
-    // 写入文件
-    let mut file = fs::File::create(config_file)
-        .map_err(|e| format!("无法写入配置文件: {}", e))?;
-    file.write_all(new_content.as_bytes())
-        .map_err(|e| format!("无法写入配置: {}", e))?;
-    
-    println!("✓ FACTORY_API_KEY 已写入 {}", config_file.display());
-    println!("✓ 请在新的终端窗口中使用，或执行: source {}", config_file.display());
-    
-    Ok(true)
-}
-
-/// 从 shell 配置文件读取 FACTORY_API_KEY（实时读取最新值）
-#[tauri::command]
-pub async fn get_factory_api_key_env() -> Result<Option<String>, String> {
-    use std::io::{BufRead, BufReader};
-
-    let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
-
-    // 按优先级尝试读取 shell 配置文件
-    let shell_configs = vec![
-        home_dir.join(".zshrc"),
-        home_dir.join(".bash_profile"),
-        home_dir.join(".bashrc"),
-    ];
-
-    for config_path in shell_configs {
-        if !config_path.exists() {
-            continue;
-        }
-
-        // 读取配置文件，查找 FACTORY_API_KEY
-        if let Ok(file) = std::fs::File::open(&config_path) {
-            let reader = BufReader::new(file);
-            let mut in_droid_config_block = false;
-
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    let trimmed = line.trim();
-
-                    // 检测 CC-Switch Droid Config 块的开始
-                    if trimmed.contains("CC-Switch Droid Config - Start") {
-                        in_droid_config_block = true;
-                        continue;
-                    }
-
-                    // 检测块的结束
-                    if trimmed.contains("CC-Switch Droid Config - End") {
-                        in_droid_config_block = false;
-                        continue;
-                    }
-
-                    // 在配置块内查找 export FACTORY_API_KEY
-                    if in_droid_config_block && trimmed.starts_with("export FACTORY_API_KEY=") {
-                        // 提取引号内的值
-                        if let Some(value_part) = trimmed.strip_prefix("export FACTORY_API_KEY=") {
-                            let value = value_part
-                                .trim()
-                                .trim_matches('"')
-                                .trim_matches('\'')
-                                .to_string();
-
-                            if !value.is_empty() {
-                                return Ok(Some(value));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // 如果配置文件中没有找到，返回 None
-    Ok(None)
-}
-
-/// 从 shell 配置文件移除 FACTORY_API_KEY
-#[tauri::command]
-pub async fn remove_factory_api_key_env() -> Result<bool, String> {
-    use std::fs;
-    use std::io::{Read, Write};
-    
-    let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
-    
-    // 尝试按优先级查找 shell 配置文件
-    let shell_configs = vec![
-        home_dir.join(".zshrc"),
-        home_dir.join(".bash_profile"),
-        home_dir.join(".bashrc"),
-    ];
-    
-    let mut removed = false;
-    
-    for config_file in shell_configs {
-        if !config_file.exists() {
-            continue;
+    #[cfg(windows)]
+    {
+        // Windows: 使用 PowerShell Profile
+        let ps_configs = vec![
+            // PowerShell Core 7+ (优先)
+            home_dir.join("Documents").join("PowerShell").join("Microsoft.PowerShell_profile.ps1"),
+            // Windows PowerShell 5.x
+            home_dir.join("Documents").join("WindowsPowerShell").join("Microsoft.PowerShell_profile.ps1"),
+        ];
+        
+        // 选择第一个存在的配置文件，如果都不存在则创建 PowerShell Core 的
+        let config_file = ps_configs
+            .iter()
+            .find(|p| p.exists())
+            .unwrap_or(&ps_configs[0])
+            .clone();
+        
+        // 确保目录存在
+        if let Some(parent) = config_file.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("无法创建 PowerShell 配置目录: {}", e))?;
         }
         
+        // 读取现有内容
         let mut content = String::new();
-        let mut file = fs::File::open(&config_file)
-            .map_err(|e| format!("无法读取配置文件: {}", e))?;
-        file.read_to_string(&mut content)
-            .map_err(|e| format!("无法读取配置文件内容: {}", e))?;
+        if config_file.exists() {
+            let mut file = fs::File::open(&config_file)
+                .map_err(|e| format!("无法读取配置文件: {}", e))?;
+            file.read_to_string(&mut content)
+                .map_err(|e| format!("无法读取配置文件内容: {}", e))?;
+        }
         
-        // 移除配置块
+        // PowerShell 语法
+        let export_line = format!("$env:FACTORY_API_KEY = \"{}\"", api_key);
         let marker_start = "# CC-Switch Droid Config - Start";
         let marker_end = "# CC-Switch Droid Config - End";
         
+        // 移除旧的配置块（如果存在）
         let lines: Vec<&str> = content.lines().collect();
         let mut new_lines = Vec::new();
         let mut skip = false;
-        let mut found = false;
         
         for line in lines {
             if line.contains(marker_start) {
                 skip = true;
-                found = true;
                 continue;
             }
             if line.contains(marker_end) {
@@ -1893,17 +1767,333 @@ pub async fn remove_factory_api_key_env() -> Result<bool, String> {
             }
         }
         
-        if found {
-            let new_content = new_lines.join("\n") + "\n";
-            let mut file = fs::File::create(&config_file)
-                .map_err(|e| format!("无法写入配置文件: {}", e))?;
-            file.write_all(new_content.as_bytes())
-                .map_err(|e| format!("无法写入配置: {}", e))?;
-            removed = true;
-        }
+        // 添加新的配置块
+        new_lines.push("");
+        new_lines.push(marker_start);
+        new_lines.push(&export_line);
+        new_lines.push(marker_end);
+        
+        let new_content = new_lines.join("\r\n") + "\r\n"; // Windows 使用 CRLF
+        
+        // 写入文件
+        let mut file = fs::File::create(&config_file)
+            .map_err(|e| format!("无法写入配置文件: {}", e))?;
+        file.write_all(new_content.as_bytes())
+            .map_err(|e| format!("无法写入配置: {}", e))?;
+        
+        println!("✓ FACTORY_API_KEY 已写入 {}", config_file.display());
+        println!("✓ 请重新打开 PowerShell 窗口以使配置生效");
+        
+        Ok(true)
     }
     
-    Ok(removed)
+    #[cfg(not(windows))]
+    {
+        // Unix: 使用 shell 配置文件
+        let shell_configs = vec![
+            home_dir.join(".zshrc"),
+            home_dir.join(".bash_profile"),
+            home_dir.join(".bashrc"),
+        ];
+        
+        let config_file = shell_configs
+            .iter()
+            .find(|p| p.exists())
+            .or(shell_configs.first())
+            .ok_or("无法找到 shell 配置文件")?;
+        
+        // 读取现有内容
+        let mut content = String::new();
+        if config_file.exists() {
+            let mut file = fs::File::open(config_file)
+                .map_err(|e| format!("无法读取配置文件: {}", e))?;
+            file.read_to_string(&mut content)
+                .map_err(|e| format!("无法读取配置文件内容: {}", e))?;
+        }
+        
+        // Unix shell 语法
+        let export_line = format!("export FACTORY_API_KEY=\"{}\"", api_key);
+        let marker_start = "# CC-Switch Droid Config - Start";
+        let marker_end = "# CC-Switch Droid Config - End";
+        
+        // 移除旧的配置块（如果存在）
+        let lines: Vec<&str> = content.lines().collect();
+        let mut new_lines = Vec::new();
+        let mut skip = false;
+        
+        for line in lines {
+            if line.contains(marker_start) {
+                skip = true;
+                continue;
+            }
+            if line.contains(marker_end) {
+                skip = false;
+                continue;
+            }
+            if !skip {
+                new_lines.push(line);
+            }
+        }
+        
+        // 添加新的配置块
+        new_lines.push("");
+        new_lines.push(marker_start);
+        new_lines.push(&export_line);
+        new_lines.push(marker_end);
+        
+        let new_content = new_lines.join("\n") + "\n";
+        
+        // 写入文件
+        let mut file = fs::File::create(config_file)
+            .map_err(|e| format!("无法写入配置文件: {}", e))?;
+        file.write_all(new_content.as_bytes())
+            .map_err(|e| format!("无法写入配置: {}", e))?;
+        
+        println!("✓ FACTORY_API_KEY 已写入 {}", config_file.display());
+        println!("✓ 请在新的终端窗口中使用，或执行: source {}", config_file.display());
+        
+        Ok(true)
+    }
+}
+
+/// 从 shell 配置文件读取 FACTORY_API_KEY（实时读取最新值）
+#[tauri::command]
+pub async fn get_factory_api_key_env() -> Result<Option<String>, String> {
+    use std::io::{BufRead, BufReader};
+
+    let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
+
+    #[cfg(windows)]
+    {
+        // Windows: 读取 PowerShell Profile
+        let ps_configs = vec![
+            home_dir.join("Documents").join("PowerShell").join("Microsoft.PowerShell_profile.ps1"),
+            home_dir.join("Documents").join("WindowsPowerShell").join("Microsoft.PowerShell_profile.ps1"),
+        ];
+
+        for config_path in ps_configs {
+            if !config_path.exists() {
+                continue;
+            }
+
+            if let Ok(file) = std::fs::File::open(&config_path) {
+                let reader = BufReader::new(file);
+                let mut in_droid_config_block = false;
+
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let trimmed = line.trim();
+
+                        if trimmed.contains("CC-Switch Droid Config - Start") {
+                            in_droid_config_block = true;
+                            continue;
+                        }
+
+                        if trimmed.contains("CC-Switch Droid Config - End") {
+                            in_droid_config_block = false;
+                            continue;
+                        }
+
+                        // 在配置块内查找 $env:FACTORY_API_KEY
+                        if in_droid_config_block && trimmed.starts_with("$env:FACTORY_API_KEY") {
+                            // 提取引号内的值
+                            if let Some(value_part) = trimmed.split('=').nth(1) {
+                                let value = value_part
+                                    .trim()
+                                    .trim_matches('"')
+                                    .trim_matches('\'')
+                                    .to_string();
+
+                                if !value.is_empty() {
+                                    return Ok(Some(value));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    #[cfg(not(windows))]
+    {
+        // Unix: 读取 shell 配置文件
+        let shell_configs = vec![
+            home_dir.join(".zshrc"),
+            home_dir.join(".bash_profile"),
+            home_dir.join(".bashrc"),
+        ];
+
+        for config_path in shell_configs {
+            if !config_path.exists() {
+                continue;
+            }
+
+            if let Ok(file) = std::fs::File::open(&config_path) {
+                let reader = BufReader::new(file);
+                let mut in_droid_config_block = false;
+
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let trimmed = line.trim();
+
+                        if trimmed.contains("CC-Switch Droid Config - Start") {
+                            in_droid_config_block = true;
+                            continue;
+                        }
+
+                        if trimmed.contains("CC-Switch Droid Config - End") {
+                            in_droid_config_block = false;
+                            continue;
+                        }
+
+                        // 在配置块内查找 export FACTORY_API_KEY
+                        if in_droid_config_block && trimmed.starts_with("export FACTORY_API_KEY=") {
+                            if let Some(value_part) = trimmed.strip_prefix("export FACTORY_API_KEY=") {
+                                let value = value_part
+                                    .trim()
+                                    .trim_matches('"')
+                                    .trim_matches('\'')
+                                    .to_string();
+
+                                if !value.is_empty() {
+                                    return Ok(Some(value));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(None)
+    }
+}
+
+/// 从 shell 配置文件移除 FACTORY_API_KEY
+#[tauri::command]
+pub async fn remove_factory_api_key_env() -> Result<bool, String> {
+    use std::fs;
+    use std::io::{Read, Write};
+    
+    let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
+    
+    #[cfg(windows)]
+    {
+        // Windows: 移除 PowerShell Profile 中的配置
+        let ps_configs = vec![
+            home_dir.join("Documents").join("PowerShell").join("Microsoft.PowerShell_profile.ps1"),
+            home_dir.join("Documents").join("WindowsPowerShell").join("Microsoft.PowerShell_profile.ps1"),
+        ];
+        
+        let mut removed = false;
+        
+        for config_file in ps_configs {
+            if !config_file.exists() {
+                continue;
+            }
+            
+            let mut content = String::new();
+            let mut file = fs::File::open(&config_file)
+                .map_err(|e| format!("无法读取配置文件: {}", e))?;
+            file.read_to_string(&mut content)
+                .map_err(|e| format!("无法读取配置文件内容: {}", e))?;
+            
+            let marker_start = "# CC-Switch Droid Config - Start";
+            let marker_end = "# CC-Switch Droid Config - End";
+            
+            let lines: Vec<&str> = content.lines().collect();
+            let mut new_lines = Vec::new();
+            let mut skip = false;
+            let mut found = false;
+            
+            for line in lines {
+                if line.contains(marker_start) {
+                    skip = true;
+                    found = true;
+                    continue;
+                }
+                if line.contains(marker_end) {
+                    skip = false;
+                    continue;
+                }
+                if !skip {
+                    new_lines.push(line);
+                }
+            }
+            
+            if found {
+                let new_content = new_lines.join("\r\n") + "\r\n"; // Windows CRLF
+                let mut file = fs::File::create(&config_file)
+                    .map_err(|e| format!("无法写入配置文件: {}", e))?;
+                file.write_all(new_content.as_bytes())
+                    .map_err(|e| format!("无法写入配置: {}", e))?;
+                removed = true;
+            }
+        }
+        
+        Ok(removed)
+    }
+    
+    #[cfg(not(windows))]
+    {
+        // Unix: 移除 shell 配置文件中的配置
+        let shell_configs = vec![
+            home_dir.join(".zshrc"),
+            home_dir.join(".bash_profile"),
+            home_dir.join(".bashrc"),
+        ];
+        
+        let mut removed = false;
+        
+        for config_file in shell_configs {
+            if !config_file.exists() {
+                continue;
+            }
+            
+            let mut content = String::new();
+            let mut file = fs::File::open(&config_file)
+                .map_err(|e| format!("无法读取配置文件: {}", e))?;
+            file.read_to_string(&mut content)
+                .map_err(|e| format!("无法读取配置文件内容: {}", e))?;
+            
+            let marker_start = "# CC-Switch Droid Config - Start";
+            let marker_end = "# CC-Switch Droid Config - End";
+            
+            let lines: Vec<&str> = content.lines().collect();
+            let mut new_lines = Vec::new();
+            let mut skip = false;
+            let mut found = false;
+            
+            for line in lines {
+                if line.contains(marker_start) {
+                    skip = true;
+                    found = true;
+                    continue;
+                }
+                if line.contains(marker_end) {
+                    skip = false;
+                    continue;
+                }
+                if !skip {
+                    new_lines.push(line);
+                }
+            }
+            
+            if found {
+                let new_content = new_lines.join("\n") + "\n";
+                let mut file = fs::File::create(&config_file)
+                    .map_err(|e| format!("无法写入配置文件: {}", e))?;
+                file.write_all(new_content.as_bytes())
+                    .map_err(|e| format!("无法写入配置: {}", e))?;
+                removed = true;
+            }
+        }
+        
+        Ok(removed)
+    }
 }
 
 /// 获取 Droid 会话历史列表
