@@ -1,0 +1,252 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如: 3.5.6）'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: macos-14
+            target: universal-apple-darwin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS targets
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Get pnpm cache directory
+        if: runner.os != 'Windows'
+        id: pnpm-cache
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        if: runner.os != 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Install droid2api dependencies
+        run: |
+          cd droid2api
+          npm install --production
+          cd ..
+
+      - name: Build Tauri App (macOS)
+        if: runner.os == 'macOS'
+        run: pnpm tauri build --target universal-apple-darwin
+
+      - name: Build Tauri App (Windows)
+        if: runner.os == 'Windows'
+        run: pnpm tauri build
+
+      - name: Build Tauri App (Linux)
+        if: runner.os == 'Linux'
+        run: pnpm tauri build
+
+      - name: Prepare macOS Assets
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -x
+          mkdir -p release-assets
+          VERSION="${GITHUB_REF_NAME}"
+          
+          # 查找 DMG 文件
+          DMG=$(find src-tauri/target -name "*.dmg" -type f | head -1 || true)
+          if [ -n "$DMG" ]; then
+            NEW_DMG="CC-Switch-${VERSION}-macOS.dmg"
+            cp "$DMG" "release-assets/$NEW_DMG"
+            echo "✅ macOS DMG copied: $NEW_DMG"
+          else
+            echo "❌ No macOS DMG found"
+            exit 1
+          fi
+          
+          # 查找 .app 并打包为 zip
+          APP_PATH=$(find src-tauri/target -name "*.app" -type d | head -1 || true)
+          if [ -n "$APP_PATH" ]; then
+            APP_DIR=$(dirname "$APP_PATH")
+            APP_NAME=$(basename "$APP_PATH")
+            NEW_ZIP="CC-Switch-${VERSION}-macOS.zip"
+            cd "$APP_DIR"
+            ditto -c -k --sequesterRsrc --keepParent "$APP_NAME" "$NEW_ZIP"
+            mv "$NEW_ZIP" "$GITHUB_WORKSPACE/release-assets/"
+            echo "✅ macOS ZIP ready: $NEW_ZIP"
+          fi
+
+      - name: Prepare Windows Assets
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          $VERSION = $env:GITHUB_REF_NAME
+          
+          # MSI 安装包
+          $msi = Get-ChildItem -Path 'src-tauri/target' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -ne $msi) {
+            $dest = "CC-Switch-$VERSION-Windows.msi"
+            Copy-Item $msi.FullName (Join-Path release-assets $dest)
+            Write-Host "✅ Windows MSI copied: $dest"
+          } else {
+            Write-Error "❌ No Windows MSI found"
+            exit 1
+          }
+          
+          # NSIS 安装包
+          $exe = Get-ChildItem -Path 'src-tauri/target' -Recurse -Include *.exe -ErrorAction SilentlyContinue | 
+                 Where-Object { $_.Directory.Name -eq 'nsis' } | Select-Object -First 1
+          if ($null -ne $exe) {
+            $dest = "CC-Switch-$VERSION-Windows-setup.exe"
+            Copy-Item $exe.FullName (Join-Path release-assets $dest)
+            Write-Host "✅ Windows NSIS copied: $dest"
+          }
+          
+          # Portable 绿色版
+          $exeCandidates = @(
+            'src-tauri/target/release/cc-switch.exe',
+            'src-tauri/target/x86_64-pc-windows-msvc/release/cc-switch.exe'
+          )
+          $exePath = $exeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if ($null -ne $exePath) {
+            $portableDir = 'release-assets/CC-Switch-Portable'
+            New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
+            Copy-Item $exePath $portableDir
+            $portableIniPath = Join-Path $portableDir 'portable.ini'
+            @('# CC Switch portable build marker', 'portable=true') | Set-Content -Path $portableIniPath -Encoding UTF8
+            $portableZip = "release-assets/CC-Switch-$VERSION-Windows-Portable.zip"
+            Compress-Archive -Path "$portableDir/*" -DestinationPath $portableZip -Force
+            Remove-Item -Recurse -Force $portableDir
+            Write-Host "✅ Windows portable ZIP created: CC-Switch-$VERSION-Windows-Portable.zip"
+          }
+
+      - name: Prepare Linux Assets
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -x
+          mkdir -p release-assets
+          VERSION="${GITHUB_REF_NAME}"
+          
+          # AppImage
+          APPIMAGE=$(find src-tauri/target/release/bundle -name "*.AppImage" -type f | head -1 || true)
+          if [ -n "$APPIMAGE" ]; then
+            NEW_APPIMAGE="CC-Switch-${VERSION}-Linux.AppImage"
+            cp "$APPIMAGE" "release-assets/$NEW_APPIMAGE"
+            chmod +x "release-assets/$NEW_APPIMAGE"
+            echo "✅ Linux AppImage copied: $NEW_APPIMAGE"
+          else
+            echo "❌ No AppImage found"
+            exit 1
+          fi
+          
+          # DEB 包
+          DEB=$(find src-tauri/target/release/bundle -name "*.deb" -type f | head -1 || true)
+          if [ -n "$DEB" ]; then
+            NEW_DEB="CC-Switch-${VERSION}-Linux.deb"
+            cp "$DEB" "release-assets/$NEW_DEB"
+            echo "✅ Linux DEB copied: $NEW_DEB"
+          fi
+
+      - name: List prepared assets
+        shell: bash
+        run: |
+          echo "📦 准备发布的文件："
+          ls -lh release-assets/ || true
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: CC-Switch ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          body: |
+            ## 🎉 CC-Switch ${{ github.ref_name }} 新版本发布
+
+            ### 📦 下载地址
+
+            #### Windows
+            - **安装版**: `CC-Switch-${{ github.ref_name }}-Windows.msi` 或 `CC-Switch-${{ github.ref_name }}-Windows-setup.exe`
+            - **绿色版**: `CC-Switch-${{ github.ref_name }}-Windows-Portable.zip`（解压即用）
+
+            #### macOS
+            - **DMG 安装包**: `CC-Switch-${{ github.ref_name }}-macOS.dmg`
+            - **ZIP 压缩包**: `CC-Switch-${{ github.ref_name }}-macOS.zip`（解压即用）
+            - 支持 Apple Silicon (M1/M2/M3) 和 Intel 芯片
+
+            #### Linux
+            - **AppImage**: `CC-Switch-${{ github.ref_name }}-Linux.AppImage`（通用，推荐）
+            - **DEB 包**: `CC-Switch-${{ github.ref_name }}-Linux.deb`（Debian/Ubuntu）
+
+            ### 🔧 macOS 用户提示
+            如遇"已损坏"提示，请在终端执行：
+            ```bash
+            xattr -cr "/Applications/CC Switch.app"
+            ```
+
+            ### 📝 更新说明
+
+            查看完整更新日志：[CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Debug - List all bundles
+        if: failure()
+        shell: bash
+        run: |
+          echo "🔍 Debug: Listing all generated bundles..."
+          find src-tauri/target -type f -name "*.*" 2>/dev/null || true
