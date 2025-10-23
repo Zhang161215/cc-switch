@@ -137,7 +137,11 @@ export interface ApiKeyInfo {
 }
 
 // 切换策略类型
-export type SwitchStrategy = 'round_robin' | 'use_lowest' | 'use_highest' | 'manual';
+export type SwitchStrategy =
+  | "round_robin"
+  | "use_lowest"
+  | "use_highest"
+  | "manual";
 
 export interface DroidProvider {
   id: string;
@@ -161,6 +165,7 @@ export interface DroidProvider {
     last_checked?: number;
   }; // 缓存的余额信息
   is_invalid?: boolean; // 标识账号是否已失效（401错误）
+  refresh_interval?: number; // 余额刷新间隔（分钟），默认60分钟
 }
 
 // Droid 会话历史

@@ -9,7 +9,7 @@ import {
   TrendingDown,
   RotateCw,
   Settings,
-  ListPlus
+  ListPlus,
 } from "lucide-react";
 import { ApiKeyInfo, SwitchStrategy } from "../types";
 import { buttonStyles, cardStyles, cn } from "../lib/styles";
@@ -28,12 +28,12 @@ interface MultiKeyManagerProps {
 const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
   apiKeys = [],
   currentKeyIndex = 0,
-  switchStrategy = 'manual',
+  switchStrategy = "manual",
   onAddKey,
   onRemoveKey,
   onSelectKey,
   onUpdateStrategy,
-  onRefreshBalances
+  onRefreshBalances,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBatchAddModal, setShowBatchAddModal] = useState(false);
@@ -61,10 +61,10 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
 
   // 策略选项
   const strategies = [
-    { value: 'manual', label: '手动切换', icon: Settings },
-    { value: 'round_robin', label: '轮询使用', icon: RotateCw },
-    { value: 'use_lowest', label: '优先最低', icon: TrendingDown },
-    { value: 'use_highest', label: '优先最高', icon: TrendingUp }
+    { value: "manual", label: "手动切换", icon: Settings },
+    { value: "round_robin", label: "轮询使用", icon: RotateCw },
+    { value: "use_lowest", label: "优先最低", icon: TrendingDown },
+    { value: "use_highest", label: "优先最高", icon: TrendingUp },
   ];
 
   // 添加新Key
@@ -97,13 +97,16 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
     setBatchAddResults(null);
 
     // 按行分割，支持多种换行符
-    const lines = batchKeysText.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+    const lines = batchKeysText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
 
     if (lines.length === 0) {
       setBatchAddResults({
         success: 0,
         failed: 0,
-        errors: ["请输入至少一个 API Key"]
+        errors: ["请输入至少一个 API Key"],
       });
       return;
     }
@@ -111,17 +114,17 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
     const results = {
       success: 0,
       failed: 0,
-      errors: [] as string[]
+      errors: [] as string[],
     };
 
-    const existingKeys = new Set(apiKeys.map(k => k.key));
+    const existingKeys = new Set(apiKeys.map((k) => k.key));
     let addedCount = 0;
 
     lines.forEach((line, index) => {
       // 支持两种格式：
       // 1. 仅 API Key：fk-xxxxx
       // 2. 名称+API Key：主Key,fk-xxxxx 或 主Key fk-xxxxx
-      const parts = line.split(/[,\s]+/).filter(p => p.length > 0);
+      const parts = line.split(/[,\s]+/).filter((p) => p.length > 0);
 
       let name = "";
       let key = "";
@@ -138,7 +141,9 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
       // 验证 API Key 格式
       if (!key.startsWith("fk-")) {
         results.failed++;
-        results.errors.push(`第 ${index + 1} 行：API Key 格式错误（应以 fk- 开头）`);
+        results.errors.push(
+          `第 ${index + 1} 行：API Key 格式错误（应以 fk- 开头）`,
+        );
         return;
       }
 
@@ -200,10 +205,11 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
 
   return (
     <div className="space-y-4">
-
       {/* 切换策略选择 */}
       <div className={cardStyles.base}>
-        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">切换策略</h4>
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+          切换策略
+        </h4>
         <div className="grid grid-cols-4 gap-2">
           {strategies.map((strategy) => {
             const Icon = strategy.icon;
@@ -221,7 +227,7 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                   "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all",
                   isActive
                     ? "bg-blue-500 text-white"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700",
                 )}
               >
                 <Icon size={14} />
@@ -246,7 +252,10 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
               title="刷新所有余额"
             >
-              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+              <RefreshCw
+                size={14}
+                className={refreshing ? "animate-spin" : ""}
+              />
               刷新余额
             </button>
             <button
@@ -283,8 +292,11 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
               key={key.id}
               className={cn(
                 cardStyles.interactive,
-                isActive && "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900",
-                key.balance && key.balance.remaining <= 0 && "border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/20"
+                isActive &&
+                  "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900",
+                key.balance &&
+                  key.balance.remaining <= 0 &&
+                  "border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/20",
               )}
             >
               <div className="flex items-center justify-between">
@@ -317,7 +329,9 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
 
                   <div className="space-y-1 text-sm">
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-500 dark:text-gray-400">API Key:</span>
+                      <span className="text-gray-500 dark:text-gray-400">
+                        API Key:
+                      </span>
                       <span className="font-mono text-xs text-gray-600 dark:text-gray-300">
                         {key.key.slice(0, 10)}...{key.key.slice(-6)}
                       </span>
@@ -326,32 +340,40 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                     {(() => {
                       // 使用默认值如果没有余额信息
                       const balance = key.balance || {
-                        total_allowance: 20000000,  // 默认20M
+                        total_allowance: 20000000, // 默认20M
                         remaining: 20000000,
                         total_used: 0,
-                        used_ratio: 0
+                        used_ratio: 0,
                       };
                       return (
                         <div className="flex items-center gap-4 mt-2">
                           <div>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">额度:</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              额度:
+                            </span>
                             <span className="ml-1 font-medium text-gray-900 dark:text-gray-100">
                               {formatNumber(balance.total_allowance)}
                             </span>
                           </div>
                           <div>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">剩余:</span>
-                            <span className={cn(
-                              "ml-1 font-medium",
-                              balance.remaining === 0 
-                                ? "text-red-500" 
-                                : "text-green-600 dark:text-green-400"
-                            )}>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              剩余:
+                            </span>
+                            <span
+                              className={cn(
+                                "ml-1 font-medium",
+                                balance.remaining === 0
+                                  ? "text-red-500"
+                                  : "text-green-600 dark:text-green-400",
+                              )}
+                            >
                               {formatNumber(balance.remaining)}
                             </span>
                           </div>
                           <div>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">使用率:</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              使用率:
+                            </span>
                             <span className="ml-1 font-medium text-gray-900 dark:text-gray-100">
                               {formatPercentage(balance.used_ratio)}
                             </span>
@@ -363,22 +385,26 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {switchStrategy === 'manual' && !isActive && (
+                  {switchStrategy === "manual" && !isActive && (
                     <button
                       onClick={() => {
                         // 检查当前key余额
                         const balance = key.balance;
                         if (balance && balance.remaining <= 0) {
                           // 查找第一个有余额的key
-                          const availableKeyIndex = apiKeys.findIndex((k, i) => 
-                            i !== index && (!k.balance || k.balance.remaining > 0)
+                          const availableKeyIndex = apiKeys.findIndex(
+                            (k, i) =>
+                              i !== index &&
+                              (!k.balance || k.balance.remaining > 0),
                           );
-                          
+
                           if (availableKeyIndex !== -1) {
                             onSelectKey(availableKeyIndex);
-                            alert(`Key "${key.name}" 余额不足，已自动切换到 "${apiKeys[availableKeyIndex].name}"`);
+                            alert(
+                              `Key "${key.name}" 余额不足，已自动切换到 "${apiKeys[availableKeyIndex].name}"`,
+                            );
                           } else {
-                            alert('所有Key余额都已耗尽，请添加新的API Key');
+                            alert("所有Key余额都已耗尽，请添加新的API Key");
                           }
                         } else {
                           onSelectKey(index);
@@ -389,10 +415,12 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                         "text-sm py-1 px-2",
                         key.balance && key.balance.remaining <= 0
                           ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
-                          : buttonStyles.secondary
+                          : buttonStyles.secondary,
                       )}
                     >
-                      {key.balance && key.balance.remaining <= 0 ? "余额不足" : "切换"}
+                      {key.balance && key.balance.remaining <= 0
+                        ? "余额不足"
+                        : "切换"}
                     </button>
                   )}
                   <button
@@ -401,7 +429,7 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                     className={cn(
                       buttonStyles.icon,
                       "text-gray-500 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-500/10",
-                      apiKeys.length === 1 && "opacity-50 cursor-not-allowed"
+                      apiKeys.length === 1 && "opacity-50 cursor-not-allowed",
                     )}
                     title="删除"
                   >
@@ -412,7 +440,7 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
             </div>
           );
         })}
-        
+
         {/* 添加新Key的占位按钮 */}
         <button
           type="button"
@@ -459,7 +487,9 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                 <input
                   type="text"
                   value={newKeyData.name}
-                  onChange={(e) => setNewKeyData({...newKeyData, name: e.target.value})}
+                  onChange={(e) =>
+                    setNewKeyData({ ...newKeyData, name: e.target.value })
+                  }
                   placeholder="例如：主要Key、备用Key等"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 />
@@ -472,7 +502,9 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                 <input
                   type="text"
                   value={newKeyData.key}
-                  onChange={(e) => setNewKeyData({...newKeyData, key: e.target.value})}
+                  onChange={(e) =>
+                    setNewKeyData({ ...newKeyData, key: e.target.value })
+                  }
                   placeholder="fk-..."
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 font-mono text-sm text-gray-900 dark:text-gray-100"
                 />
@@ -502,7 +534,7 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                 disabled={!newKeyData.key}
                 className={cn(
                   buttonStyles.primary,
-                  !newKeyData.key && "opacity-50 cursor-not-allowed"
+                  !newKeyData.key && "opacity-50 cursor-not-allowed",
                 )}
               >
                 添加
@@ -541,14 +573,30 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 space-y-1">
                   <p>支持以下格式：</p>
                   <ul className="list-disc list-inside pl-2">
-                    <li>仅 API Key：<code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">fk-xxxxx</code></li>
-                    <li>名称 + API Key：<code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">主Key fk-xxxxx</code> 或 <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">主Key,fk-xxxxx</code></li>
+                    <li>
+                      仅 API Key：
+                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                        fk-xxxxx
+                      </code>
+                    </li>
+                    <li>
+                      名称 + API Key：
+                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                        主Key fk-xxxxx
+                      </code>{" "}
+                      或{" "}
+                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                        主Key,fk-xxxxx
+                      </code>
+                    </li>
                   </ul>
                 </div>
                 <textarea
                   value={batchKeysText}
                   onChange={(e) => setBatchKeysText(e.target.value)}
-                  placeholder={"示例：\nfk-abc123def456\n备用Key fk-xyz789uvw012\n主Key,fk-123456789abc"}
+                  placeholder={
+                    "示例：\nfk-abc123def456\n备用Key fk-xyz789uvw012\n主Key,fk-123456789abc"
+                  }
                   rows={10}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 font-mono text-sm text-gray-900 dark:text-gray-100 resize-none"
                 />
@@ -556,34 +604,48 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
 
               {/* 添加结果显示 */}
               {batchAddResults && (
-                <div className={cn(
-                  "p-4 rounded-lg border",
-                  batchAddResults.failed === 0
-                    ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-                    : "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
-                )}>
+                <div
+                  className={cn(
+                    "p-4 rounded-lg border",
+                    batchAddResults.failed === 0
+                      ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                      : "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800",
+                  )}
+                >
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={cn(
-                      "text-sm font-medium",
-                      batchAddResults.failed === 0
-                        ? "text-green-700 dark:text-green-400"
-                        : "text-yellow-700 dark:text-yellow-400"
-                    )}>
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        batchAddResults.failed === 0
+                          ? "text-green-700 dark:text-green-400"
+                          : "text-yellow-700 dark:text-yellow-400",
+                      )}
+                    >
                       添加结果
                     </span>
                   </div>
                   <div className="text-sm space-y-1">
                     <p className="text-gray-700 dark:text-gray-300">
-                      成功：<span className="font-semibold text-green-600 dark:text-green-400">{batchAddResults.success}</span> 个
+                      成功：
+                      <span className="font-semibold text-green-600 dark:text-green-400">
+                        {batchAddResults.success}
+                      </span>{" "}
+                      个
                     </p>
                     {batchAddResults.failed > 0 && (
                       <>
                         <p className="text-gray-700 dark:text-gray-300">
-                          失败：<span className="font-semibold text-red-600 dark:text-red-400">{batchAddResults.failed}</span> 个
+                          失败：
+                          <span className="font-semibold text-red-600 dark:text-red-400">
+                            {batchAddResults.failed}
+                          </span>{" "}
+                          个
                         </p>
                         {batchAddResults.errors.length > 0 && (
                           <div className="mt-2 pt-2 border-t border-gray-300 dark:border-gray-600">
-                            <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">错误详情：</p>
+                            <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              错误详情：
+                            </p>
                             <ul className="list-disc list-inside space-y-0.5 text-xs text-gray-600 dark:text-gray-400">
                               {batchAddResults.errors.map((error, idx) => (
                                 <li key={idx}>{error}</li>
@@ -623,7 +685,7 @@ const MultiKeyManager: React.FC<MultiKeyManagerProps> = ({
                   disabled={!batchKeysText.trim()}
                   className={cn(
                     buttonStyles.primary,
-                    !batchKeysText.trim() && "opacity-50 cursor-not-allowed"
+                    !batchKeysText.trim() && "opacity-50 cursor-not-allowed",
                   )}
                 >
                   {batchAddResults ? "重试" : "批量添加"}

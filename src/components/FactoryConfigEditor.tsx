@@ -1,17 +1,36 @@
 import React, { useState, useEffect } from "react";
-import { Settings, ChevronDown, ChevronUp, Edit3, Trash2, Plus, Save, X, Eye, EyeOff } from "lucide-react";
+import {
+  Settings,
+  ChevronDown,
+  ChevronUp,
+  Edit3,
+  Trash2,
+  Plus,
+  Save,
+  X,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { DroidConfig, DroidCustomModel } from "../types";
 import { isLinux } from "../lib/platform";
 
 interface FactoryConfigEditorProps {
-  onNotify?: (message: string, type: "success" | "error", duration?: number) => void;
+  onNotify?: (
+    message: string,
+    type: "success" | "error",
+    duration?: number,
+  ) => void;
 }
 
-const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) => {
+const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
+  onNotify,
+}) => {
   const [config, setConfig] = useState<DroidConfig | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [editingModel, setEditingModel] = useState<DroidCustomModel | null>(null);
+  const [editingModel, setEditingModel] = useState<DroidCustomModel | null>(
+    null,
+  );
   const [editingIndex, setEditingIndex] = useState<number>(-1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -61,7 +80,13 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
     if (!editingModel || !config) return;
 
     // 验证必填字段
-    if (!editingModel.model_display_name || !editingModel.model || !editingModel.base_url || !editingModel.api_key || !editingModel.provider) {
+    if (
+      !editingModel.model_display_name ||
+      !editingModel.model ||
+      !editingModel.base_url ||
+      !editingModel.api_key ||
+      !editingModel.provider
+    ) {
       onNotify?.("请填写所有必填字段", "error");
       return;
     }
@@ -90,7 +115,7 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
   // 删除模型
   const handleDeleteModel = async (index: number) => {
     if (!config) return;
-    
+
     if (!window.confirm("确定要删除这个模型配置吗？")) return;
 
     try {
@@ -199,7 +224,10 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
 
             {/* 配置文件路径 */}
             <div className="pt-2 text-xs text-gray-500 dark:text-gray-400">
-              配置文件: <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">~/.factory/config.json</code>
+              配置文件:{" "}
+              <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">
+                ~/.factory/config.json
+              </code>
             </div>
           </div>
         )}
@@ -214,7 +242,9 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
           }}
         >
           {/* Backdrop */}
-          <div className={`absolute inset-0 bg-black/50 dark:bg-black/70${isLinux() ? "" : " backdrop-blur-sm"}`} />
+          <div
+            className={`absolute inset-0 bg-black/50 dark:bg-black/70${isLinux() ? "" : " backdrop-blur-sm"}`}
+          />
 
           {/* Modal */}
           <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
@@ -243,7 +273,10 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
                   type="text"
                   value={editingModel.model_display_name}
                   onChange={(e) =>
-                    setEditingModel({ ...editingModel, model_display_name: e.target.value })
+                    setEditingModel({
+                      ...editingModel,
+                      model_display_name: e.target.value,
+                    })
                   }
                   placeholder="例如: Sonnet 4.5"
                   className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
@@ -274,13 +307,18 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
                 <select
                   value={editingModel.provider}
                   onChange={(e) =>
-                    setEditingModel({ ...editingModel, provider: e.target.value })
+                    setEditingModel({
+                      ...editingModel,
+                      provider: e.target.value,
+                    })
                   }
                   className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
                   <option value="anthropic">anthropic</option>
                   <option value="openai">openai</option>
-                  <option value="generic-chat-completion-api">generic-chat-completion-api</option>
+                  <option value="generic-chat-completion-api">
+                    generic-chat-completion-api
+                  </option>
                 </select>
               </div>
 
@@ -293,7 +331,10 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
                   type="url"
                   value={editingModel.base_url}
                   onChange={(e) =>
-                    setEditingModel({ ...editingModel, base_url: e.target.value })
+                    setEditingModel({
+                      ...editingModel,
+                      base_url: e.target.value,
+                    })
                   }
                   placeholder="例如: https://api.anthropic.com"
                   className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
@@ -310,7 +351,10 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
                     type={showApiKey ? "text" : "password"}
                     value={editingModel.api_key}
                     onChange={(e) =>
-                      setEditingModel({ ...editingModel, api_key: e.target.value })
+                      setEditingModel({
+                        ...editingModel,
+                        api_key: e.target.value,
+                      })
                     }
                     placeholder="sk-ant-..."
                     autoComplete="off"
@@ -338,7 +382,10 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
                   type="number"
                   value={editingModel.max_tokens || 8192}
                   onChange={(e) =>
-                    setEditingModel({ ...editingModel, max_tokens: parseInt(e.target.value) || 8192 })
+                    setEditingModel({
+                      ...editingModel,
+                      max_tokens: parseInt(e.target.value) || 8192,
+                    })
                   }
                   className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
@@ -351,7 +398,10 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({ onNotify }) =
                   id="supports_prompt_caching"
                   checked={editingModel.supports_prompt_caching || false}
                   onChange={(e) =>
-                    setEditingModel({ ...editingModel, supports_prompt_caching: e.target.checked })
+                    setEditingModel({
+                      ...editingModel,
+                      supports_prompt_caching: e.target.checked,
+                    })
                   }
                   className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-500 focus:ring-blue-500"
                 />

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { DroidProvider } from "../types";
 import { X, Eye, EyeOff, ListPlus, Plus } from "lucide-react";
 import { buttonStyles, cn } from "../lib/styles";
+import BatchPreviewModal from "./BatchPreviewModal";
 
 interface DroidKeyModalProps {
   provider?: DroidProvider;
@@ -27,12 +28,16 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
     errors: string[];
   } | null>(null);
 
+  // 批量添加预览状态
+  const [showBatchPreview, setShowBatchPreview] = useState(false);
+  const [validatedProviders, setValidatedProviders] = useState<DroidProvider[]>([]);
+
   const [formData, setFormData] = useState<DroidProvider>(
     provider || {
       id: "",
       name: "",
-      api_key: ""
-    }
+      api_key: "",
+    },
   );
 
   const handleInputChange = (field: keyof DroidProvider, value: string) => {
@@ -49,7 +54,7 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
       // 如果名称为空，自动生成默认名称（fk-后六位）
       const finalData = {
         ...formData,
-        name: formData.name.trim() || `fk-${formData.api_key.slice(-6)}`
+        name: formData.name.trim() || `fk-${formData.api_key.slice(-6)}`,
       };
       console.log("[DroidKeyModal] Submitting data:", finalData);
       onSubmit(finalData);
@@ -61,13 +66,16 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
     setBatchAddResults(null);
 
     // 按行分割，支持多种换行符
-    const lines = batchKeysText.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+    const lines = batchKeysText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
 
     if (lines.length === 0) {
       setBatchAddResults({
         success: 0,
         failed: 0,
-        errors: ["请输入至少一个 API Key"]
+        errors: ["请输入至少一个 API Key"],
       });
       return;
     }
@@ -75,7 +83,7 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
     const results = {
       success: 0,
       failed: 0,
-      errors: [] as string[]
+      errors: [] as string[],
     };
 
     const validProviders: DroidProvider[] = [];
@@ -85,7 +93,7 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
       // 支持两种格式：
       // 1. 仅 API Key：fk-xxxxx
       // 2. 名称+API Key：主Key,fk-xxxxx 或 主Key fk-xxxxx
-      const parts = line.split(/[,\s]+/).filter(p => p.length > 0);
+      const parts = line.split(/[,\s]+/).filter((p) => p.length > 0);
 
       let name = "";
       let key = "";
@@ -102,7 +110,9 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
       // 验证 API Key 格式
       if (!key.startsWith("fk-")) {
         results.failed++;
-        results.errors.push(`第 ${index + 1} 行：API Key 格式错误（应以 fk- 开���）`);
+        results.errors.push(
+          `第 ${index + 1} 行：API Key 格式错误（应以 fk- 开���）`,
+        );
         return;
       }
 
@@ -128,19 +138,36 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
       results.success++;
     });
 
-    setBatchAddResults(results);
-
-    // 如果有成功的，调用批量提交
-    if (validProviders.length > 0 && onBatchSubmit) {
-      onBatchSubmit(validProviders);
-
-      // 如果全部成功，延迟关闭
-      if (results.failed === 0) {
-        setTimeout(() => {
-          onClose();
-        }, 1500);
-      }
+    // 如果有错误，显示错误信息
+    if (results.failed > 0) {
+      setBatchAddResults(results);
+      return;
     }
+
+    // 如果验证成功，显示预览界面
+    if (validProviders.length > 0) {
+      setValidatedProviders(validProviders);
+      setShowBatchPreview(true);
+    }
+  };
+
+  // 确认批量添加
+  const handleConfirmBatchAdd = (selectedProviders: DroidProvider[]) => {
+    if (onBatchSubmit && selectedProviders.length > 0) {
+      onBatchSubmit(selectedProviders);
+      setShowBatchPreview(false);
+      setTimeout(() => {
+        onClose();
+        setBatchKeysText('');
+        setValidatedProviders([]);
+        setBatchAddResults(null);
+      }, 500);
+    }
+  };
+
+  // 取消预览
+  const handleCancelPreview = () => {
+    setShowBatchPreview(false);
   };
 
   const isEditing = !!provider;
@@ -179,7 +206,7 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
                     "inline-flex items-center gap-1.5 px-3 py-1 text-sm font-medium rounded-md transition-colors",
                     !isBatchMode
                       ? "bg-blue-500 text-white"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200",
                   )}
                 >
                   <Plus size={14} />
@@ -195,7 +222,7 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
                     "inline-flex items-center gap-1.5 px-3 py-1 text-sm font-medium rounded-md transition-colors",
                     isBatchMode
                       ? "bg-purple-500 text-white"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200",
                   )}
                 >
                   <ListPlus size={14} />
@@ -245,7 +272,9 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
                     <input
                       type={showApiKey ? "text" : "password"}
                       value={formData.api_key}
-                      onChange={(e) => handleInputChange("api_key", e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange("api_key", e.target.value)
+                      }
                       className="w-full px-3 py-2 pr-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
                       required
                       placeholder="fk-..."
@@ -290,14 +319,30 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 space-y-1">
                   <p>支持以下格式：</p>
                   <ul className="list-disc list-inside pl-2">
-                    <li>仅 API Key：<code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">fk-xxxxx</code></li>
-                    <li>名称 + API Key：<code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">主Key fk-xxxxx</code> 或 <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">主Key,fk-xxxxx</code></li>
+                    <li>
+                      仅 API Key：
+                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                        fk-xxxxx
+                      </code>
+                    </li>
+                    <li>
+                      名称 + API Key：
+                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                        主Key fk-xxxxx
+                      </code>{" "}
+                      或{" "}
+                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                        主Key,fk-xxxxx
+                      </code>
+                    </li>
                   </ul>
                 </div>
                 <textarea
                   value={batchKeysText}
                   onChange={(e) => setBatchKeysText(e.target.value)}
-                  placeholder={"示例：\nfk-abc123def456\n备用Key fk-xyz789uvw012\n主Key,fk-123456789abc"}
+                  placeholder={
+                    "示例：\nfk-abc123def456\n备用Key fk-xyz789uvw012\n主Key,fk-123456789abc"
+                  }
                   rows={12}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 font-mono text-sm text-gray-900 dark:text-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:focus:ring-purple-400/20 focus:border-purple-500 dark:focus:border-purple-400 transition-colors"
                 />
@@ -305,34 +350,48 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
 
               {/* 添加结果显示 */}
               {batchAddResults && (
-                <div className={cn(
-                  "p-4 rounded-lg border",
-                  batchAddResults.failed === 0
-                    ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-                    : "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
-                )}>
+                <div
+                  className={cn(
+                    "p-4 rounded-lg border",
+                    batchAddResults.failed === 0
+                      ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                      : "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800",
+                  )}
+                >
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={cn(
-                      "text-sm font-medium",
-                      batchAddResults.failed === 0
-                        ? "text-green-700 dark:text-green-400"
-                        : "text-yellow-700 dark:text-yellow-400"
-                    )}>
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        batchAddResults.failed === 0
+                          ? "text-green-700 dark:text-green-400"
+                          : "text-yellow-700 dark:text-yellow-400",
+                      )}
+                    >
                       添加结果
                     </span>
                   </div>
                   <div className="text-sm space-y-1">
                     <p className="text-gray-700 dark:text-gray-300">
-                      成功：<span className="font-semibold text-green-600 dark:text-green-400">{batchAddResults.success}</span> 个
+                      成功：
+                      <span className="font-semibold text-green-600 dark:text-green-400">
+                        {batchAddResults.success}
+                      </span>{" "}
+                      个
                     </p>
                     {batchAddResults.failed > 0 && (
                       <>
                         <p className="text-gray-700 dark:text-gray-300">
-                          失败：<span className="font-semibold text-red-600 dark:text-red-400">{batchAddResults.failed}</span> 个
+                          失败：
+                          <span className="font-semibold text-red-600 dark:text-red-400">
+                            {batchAddResults.failed}
+                          </span>{" "}
+                          个
                         </p>
                         {batchAddResults.errors.length > 0 && (
                           <div className="mt-2 pt-2 border-t border-gray-300 dark:border-gray-600">
-                            <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">错误详情：</p>
+                            <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              错误详情：
+                            </p>
                             <ul className="list-disc list-inside space-y-0.5 text-xs text-gray-600 dark:text-gray-400 max-h-32 overflow-y-auto">
                               {batchAddResults.errors.map((error, idx) => (
                                 <li key={idx}>{error}</li>
@@ -363,16 +422,25 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
                   disabled={!batchKeysText.trim()}
                   className={cn(
                     "px-4 py-2 text-sm font-medium text-white bg-purple-500 hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700 rounded-lg transition-colors",
-                    !batchKeysText.trim() && "opacity-50 cursor-not-allowed"
+                    !batchKeysText.trim() && "opacity-50 cursor-not-allowed",
                   )}
                 >
-                  {batchAddResults ? "重试" : "批量添加"}
+                  {batchAddResults ? "重试验证" : "验证并预览"}
                 </button>
               )}
             </div>
           </div>
         )}
       </div>
+
+      {/* 批量预览模态框 */}
+      {showBatchPreview && (
+        <BatchPreviewModal
+          providers={validatedProviders}
+          onConfirm={handleConfirmBatchAdd}
+          onCancel={handleCancelPreview}
+        />
+      )}
     </div>
   );
 };

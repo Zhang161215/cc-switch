@@ -794,7 +794,10 @@ export const tauriAPI = {
   },
 
   // 更新 Factory 配置中的自定义模型
-  updateFactoryCustomModel: async (oldDisplayName: string, model: any): Promise<void> => {
+  updateFactoryCustomModel: async (
+    oldDisplayName: string,
+    model: any,
+  ): Promise<void> => {
     try {
       await invoke("update_factory_custom_model", { oldDisplayName, model });
     } catch (error) {

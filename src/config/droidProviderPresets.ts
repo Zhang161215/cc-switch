@@ -47,5 +47,5 @@ export const droidProviderPresets: DroidProviderPreset[] = [
     model: "",
     model_display_name: "",
     provider: "anthropic",
-  }
+  },
 ];

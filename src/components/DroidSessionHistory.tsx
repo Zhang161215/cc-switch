@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
 import { DroidSession } from "../types";
-import { History, Terminal, Copy, Check, Clock, Zap, Trash2, AlertTriangle } from "lucide-react";
+import {
+  History,
+  Terminal,
+  Copy,
+  Check,
+  Clock,
+  Zap,
+  Trash2,
+  AlertTriangle,
+} from "lucide-react";
 import { buttonStyles, cardStyles, cn } from "../lib/styles";
 
 interface DroidSessionHistoryProps {
@@ -41,13 +50,13 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
     try {
       // 获取恢复会话的命令（格式：droid exec -s SESSION_ID "继续上次的工作"）
       const command = await window.api.getDroidSessionCommand(sessionId);
-      
+
       // 使用后端命令复制（避免前端权限问题）
       await window.api.copyToClipboard(command);
-      
+
       setCopiedId(sessionId);
       onNotify?.(`命令已复制`, "success");
-      
+
       // 3秒后重置复制状态
       setTimeout(() => setCopiedId(null), 3000);
     } catch (error) {
@@ -89,7 +98,7 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
       const date = new Date(timestamp);
       const now = new Date();
       const diff = now.getTime() - date.getTime();
-      
+
       // 小于1分钟
       if (diff < 60 * 1000) {
         return "刚刚";
@@ -133,10 +142,7 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className={cn(
-          buttonStyles.secondary,
-          "flex items-center gap-2"
-        )}
+        className={cn(buttonStyles.secondary, "flex items-center gap-2")}
       >
         <History size={16} />
         会话历史
@@ -164,8 +170,18 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
             onClick={() => setIsOpen(false)}
             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -186,10 +202,7 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
               {sessions.map((session) => (
                 <div
                   key={session.id}
-                  className={cn(
-                    cardStyles.interactive,
-                    "p-3"
-                  )}
+                  className={cn(cardStyles.interactive, "p-3")}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -209,38 +222,44 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
                           <Trash2 size={14} />
                         </button>
                       </div>
-                      
+
                       {session.token_usage && (
                         <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
                           <span className="flex items-center gap-1">
                             <Zap size={11} className="text-yellow-500" />
-                            输入: {formatTokens(session.token_usage.input_tokens)}
+                            输入:{" "}
+                            {formatTokens(session.token_usage.input_tokens)}
                           </span>
                           <span className="flex items-center gap-1">
                             <Zap size={11} className="text-green-500" />
-                            输出: {formatTokens(session.token_usage.output_tokens)}
+                            输出:{" "}
+                            {formatTokens(session.token_usage.output_tokens)}
                           </span>
-                          {session.token_usage.cache_read_tokens && session.token_usage.cache_read_tokens > 0 && (
-                            <span className="flex items-center gap-1">
-                              <Zap size={11} className="text-blue-500" />
-                              缓存: {formatTokens(session.token_usage.cache_read_tokens)}
-                            </span>
-                          )}
+                          {session.token_usage.cache_read_tokens &&
+                            session.token_usage.cache_read_tokens > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Zap size={11} className="text-blue-500" />
+                                缓存:{" "}
+                                {formatTokens(
+                                  session.token_usage.cache_read_tokens,
+                                )}
+                              </span>
+                            )}
                         </div>
                       )}
-                      
+
                       <div className="mt-1 font-mono text-xs text-gray-400 dark:text-gray-500">
                         {session.id}
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => openInTerminal(session.id)}
                         className={cn(
                           "px-2.5 py-1 text-xs rounded-md transition-all",
                           "bg-blue-500 hover:bg-blue-600 text-white",
-                          "flex items-center gap-1 shadow-sm"
+                          "flex items-center gap-1 shadow-sm",
                         )}
                         title="在终端中打开"
                       >
@@ -253,7 +272,7 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
                           "px-2.5 py-1 text-xs rounded-md transition-all",
                           "border border-gray-300 dark:border-gray-600",
                           "hover:bg-gray-50 dark:hover:bg-gray-700",
-                          "flex items-center gap-1"
+                          "flex items-center gap-1",
                         )}
                         title="复制会话ID"
                       >
@@ -299,7 +318,10 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-6 max-w-md mx-4">
               <div className="flex items-start gap-3 mb-4">
                 <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                  <AlertTriangle size={20} className="text-red-600 dark:text-red-400" />
+                  <AlertTriangle
+                    size={20}
+                    className="text-red-600 dark:text-red-400"
+                  />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
@@ -313,7 +335,7 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={() => setDeleteConfirmId(null)}
@@ -326,7 +348,7 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
                   className={cn(
                     "px-4 py-2 rounded-lg transition-all duration-200",
                     "bg-red-500 hover:bg-red-600 text-white",
-                    "font-medium shadow-sm"
+                    "font-medium shadow-sm",
                   )}
                 >
                   确认删除

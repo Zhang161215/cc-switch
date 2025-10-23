@@ -1,5 +1,5 @@
-import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
-import { Key, RefreshCw, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useImperativeHandle, forwardRef } from "react";
+import { Key, RefreshCw, AlertCircle } from "lucide-react";
 
 export interface FactoryEnvDisplayRef {
   refresh: () => void;
@@ -9,7 +9,10 @@ interface FactoryEnvDisplayProps {
   currentProviderId?: string;
 }
 
-export const FactoryEnvDisplay = forwardRef<FactoryEnvDisplayRef, FactoryEnvDisplayProps>(({ currentProviderId }, ref) => {
+export const FactoryEnvDisplay = forwardRef<
+  FactoryEnvDisplayRef,
+  FactoryEnvDisplayProps
+>(({ currentProviderId }, ref) => {
   const [currentApiKey, setCurrentApiKey] = useState<string | null>(null);
   const [envApiKey, setEnvApiKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -19,7 +22,7 @@ export const FactoryEnvDisplay = forwardRef<FactoryEnvDisplayRef, FactoryEnvDisp
     try {
       // 获取当前选中 provider 的所有信息
       const providers = await window.api.getDroidProviders();
-      const currentProvider = providers.find(p => p.id === currentProviderId);
+      const currentProvider = providers.find((p) => p.id === currentProviderId);
 
       // 设置当前使用的 API key
       if (currentProvider) {
@@ -32,7 +35,7 @@ export const FactoryEnvDisplay = forwardRef<FactoryEnvDisplayRef, FactoryEnvDisp
       const envKey = await window.api.getFactoryApiKeyEnv();
       setEnvApiKey(envKey);
     } catch (error) {
-      console.error('获取 API Key 信息失败:', error);
+      console.error("获取 API Key 信息失败:", error);
       setCurrentApiKey(null);
       setEnvApiKey(null);
     } finally {
@@ -41,7 +44,7 @@ export const FactoryEnvDisplay = forwardRef<FactoryEnvDisplayRef, FactoryEnvDisp
   };
 
   useImperativeHandle(ref, () => ({
-    refresh: fetchKeys
+    refresh: fetchKeys,
   }));
 
   useEffect(() => {
@@ -67,7 +70,7 @@ export const FactoryEnvDisplay = forwardRef<FactoryEnvDisplayRef, FactoryEnvDisp
           className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded transition-colors"
           title="刷新"
         >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
 
@@ -97,9 +100,7 @@ export const FactoryEnvDisplay = forwardRef<FactoryEnvDisplayRef, FactoryEnvDisp
             {envApiKey.slice(0, 10)}...{envApiKey.slice(-6)}
           </div>
         ) : (
-          <div className="text-gray-500 dark:text-gray-400 italic">
-            未设置
-          </div>
+          <div className="text-gray-500 dark:text-gray-400 italic">未设置</div>
         )}
       </div>
 
@@ -108,7 +109,12 @@ export const FactoryEnvDisplay = forwardRef<FactoryEnvDisplayRef, FactoryEnvDisp
         <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded flex items-start gap-2">
           <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
           <div className="text-xs text-yellow-700 dark:text-yellow-300">
-            <strong>注意：</strong>环境变量与当前使用的 API Key 不一致。在新的终端窗口中，请执行 <code className="bg-yellow-100 dark:bg-yellow-900 px-1 py-0.5 rounded">source ~/.zshrc</code> 来更新环境变量。
+            <strong>注意：</strong>环境变量与当前使用的 API Key
+            不一致。在新的终端窗口中，请执行{" "}
+            <code className="bg-yellow-100 dark:bg-yellow-900 px-1 py-0.5 rounded">
+              source ~/.zshrc
+            </code>{" "}
+            来更新环境变量。
           </div>
         </div>
       )}
@@ -116,7 +122,13 @@ export const FactoryEnvDisplay = forwardRef<FactoryEnvDisplayRef, FactoryEnvDisp
       {keysMatch && currentApiKey && (
         <div className="mt-3 flex items-start gap-2 text-xs text-green-600 dark:text-green-400">
           <div className="mt-0.5">✓</div>
-          <div>环境变量已同步，在新终端中执行 <code className="bg-white dark:bg-gray-800 px-1 py-0.5 rounded">source ~/.zshrc</code> 即可使用。</div>
+          <div>
+            环境变量已同步，在新终端中执行{" "}
+            <code className="bg-white dark:bg-gray-800 px-1 py-0.5 rounded">
+              source ~/.zshrc
+            </code>{" "}
+            即可使用。
+          </div>
         </div>
       )}
     </div>

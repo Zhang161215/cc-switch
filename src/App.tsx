@@ -5,9 +5,14 @@ import { AppType } from "./lib/tauri-api";
 import ProviderList from "./components/ProviderList";
 import AddProviderModal from "./components/AddProviderModal";
 import EditProviderModal from "./components/EditProviderModal";
-import DroidProviderList, { DroidProviderListRef } from "./components/DroidProviderList";
+import DroidProviderList, {
+  DroidProviderListRef,
+} from "./components/DroidProviderList";
 import DroidKeyModal from "./components/DroidKeyModal";
-import { FactoryEnvDisplay, FactoryEnvDisplayRef } from "./components/FactoryEnvDisplay";
+import {
+  FactoryEnvDisplay,
+  FactoryEnvDisplayRef,
+} from "./components/FactoryEnvDisplay";
 import DroidSessionHistory from "./components/DroidSessionHistory";
 import FactoryConfigEditor from "./components/FactoryConfigEditor";
 import { ConfirmDialog } from "./components/ConfirmDialog";
@@ -27,12 +32,14 @@ function App() {
   const [providers, setProviders] = useState<Record<string, Provider>>({});
   const [currentProviderId, setCurrentProviderId] = useState<string>("");
   const [droidProviders, setDroidProviders] = useState<DroidProvider[]>([]);
-  const [currentDroidProviderId, setCurrentDroidProviderId] = useState<string>("");
+  const [currentDroidProviderId, setCurrentDroidProviderId] =
+    useState<string>("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState<string | null>(
     null,
   );
-  const [editingDroidProvider, setEditingDroidProvider] = useState<DroidProvider | null>(null);
+  const [editingDroidProvider, setEditingDroidProvider] =
+    useState<DroidProvider | null>(null);
   const [isDroidKeyModalOpen, setIsDroidKeyModalOpen] = useState(false);
   const [notification, setNotification] = useState<{
     message: string;
@@ -147,28 +154,30 @@ function App() {
   const loadDroidProviders = async () => {
     try {
       const providers = await window.api.getDroidProviders();
-      
+
       // 优先从环境变量获取当前使用的 Key
       const envApiKey = await window.api.getFactoryApiKeyEnv();
       let currentId = "";
-      
+
       if (envApiKey) {
         // 根据环境变量中的 API Key 找到对应的 provider
-        const matchedProvider = providers.find(p => p.api_key === envApiKey);
+        const matchedProvider = providers.find((p) => p.api_key === envApiKey);
         if (matchedProvider) {
           currentId = matchedProvider.id;
-          console.log(`从环境变量匹配到 provider: ${matchedProvider.name} (${currentId})`);
+          console.log(
+            `从环境变量匹配到 provider: ${matchedProvider.name} (${currentId})`,
+          );
         } else {
           console.warn("环境变量中的 API Key 在列表中未找到");
         }
       }
-      
+
       // 如果环境变量没有匹配到，使用存储的 currentId
       if (!currentId) {
         currentId = await window.api.getCurrentDroidProvider();
         console.log(`使用存储的 currentId: ${currentId}`);
       }
-      
+
       setDroidProviders(providers);
       setCurrentDroidProviderId(currentId);
     } catch (error) {
@@ -359,12 +368,16 @@ function App() {
         addedProviderIds.push(newProvider.id);
       }
       await loadDroidProviders();
-      showNotification(`成功添加 ${addedProviderIds.length} 个 Droid Key`, "success", 2000);
+      showNotification(
+        `成功添加 ${addedProviderIds.length} 个 Droid Key`,
+        "success",
+        2000,
+      );
 
       // 批量添加成功后自动查询所有新增 Key 的余额
       setTimeout(() => {
         if (droidProviderListRef.current) {
-          addedProviderIds.forEach(id => {
+          addedProviderIds.forEach((id) => {
             droidProviderListRef.current?.fetchBalance(id);
           });
         }
@@ -380,7 +393,10 @@ function App() {
     setIsDroidKeyModalOpen(true);
   };
 
-  const handleUpdateDroidProvider = async (provider: DroidProvider, silent = false) => {
+  const handleUpdateDroidProvider = async (
+    provider: DroidProvider,
+    silent = false,
+  ) => {
     try {
       console.log("[Frontend] Updating provider:", provider);
       await window.api.updateDroidProvider(provider);
@@ -407,7 +423,7 @@ function App() {
   };
 
   const handleDeleteDroidProvider = async (id: string) => {
-    const provider = droidProviders.find(p => p.id === id);
+    const provider = droidProviders.find((p) => p.id === id);
     setConfirmDialog({
       isOpen: true,
       title: "删除 Droid Key",
@@ -493,7 +509,11 @@ function App() {
             </button>
 
             <button
-              onClick={() => activeApp === "droid" ? setIsDroidKeyModalOpen(true) : setIsAddModalOpen(true)}
+              onClick={() =>
+                activeApp === "droid"
+                  ? setIsDroidKeyModalOpen(true)
+                  : setIsAddModalOpen(true)
+              }
               className={`inline-flex items-center gap-2 ${buttonStyles.primary}`}
             >
               {activeApp === "droid" ? <Key size={16} /> : <Plus size={16} />}
@@ -526,7 +546,7 @@ function App() {
                 <div className="mb-4 flex justify-end">
                   <DroidSessionHistory onNotify={showNotification} />
                 </div>
-                
+
                 <DroidProviderList
                   ref={droidProviderListRef}
                   providers={droidProviders}
@@ -537,7 +557,10 @@ function App() {
                   onUpdate={handleUpdateDroidProvider}
                   onNotify={showNotification}
                 />
-                <FactoryEnvDisplay ref={factoryEnvRef} currentProviderId={currentDroidProviderId} />
+                <FactoryEnvDisplay
+                  ref={factoryEnvRef}
+                  currentProviderId={currentDroidProviderId}
+                />
                 <FactoryConfigEditor onNotify={showNotification} />
               </>
             ) : (
@@ -600,10 +623,14 @@ function App() {
       {isDroidKeyModalOpen && (
         <DroidKeyModal
           provider={editingDroidProvider || undefined}
-          onSubmit={editingDroidProvider
-            ? (provider) => handleUpdateDroidProvider(provider, false)
-            : handleAddDroidProvider}
-          onBatchSubmit={editingDroidProvider ? undefined : handleBatchAddDroidProviders}
+          onSubmit={
+            editingDroidProvider
+              ? (provider) => handleUpdateDroidProvider(provider, false)
+              : handleAddDroidProvider
+          }
+          onBatchSubmit={
+            editingDroidProvider ? undefined : handleBatchAddDroidProviders
+          }
           onClose={() => {
             setIsDroidKeyModalOpen(false);
             setEditingDroidProvider(null);

@@ -1,6 +1,13 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { X, Save, AlertCircle, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import {
+  X,
+  Save,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+} from "lucide-react";
 import { McpServer, McpServerSpec } from "../../types";
 import {
   mcpPresets,
@@ -125,10 +132,7 @@ const McpFormModal: React.FC<McpFormModalProps> = ({
   const syncTargetLabel =
     appType === "claude" ? t("apps.codex") : t("apps.claude");
   const otherAppType: AppType = appType === "claude" ? "codex" : "claude";
-  const syncCheckboxId = useMemo(
-    () => `sync-other-side-${appType}`,
-    [appType],
-  );
+  const syncCheckboxId = useMemo(() => `sync-other-side-${appType}`, [appType]);
 
   // 检测另一侧是否有同名 MCP
   useEffect(() => {
@@ -141,7 +145,9 @@ const McpFormModal: React.FC<McpFormModalProps> = ({
 
       try {
         const otherConfig = await window.api.getMcpConfig(otherAppType);
-        const hasConflict = Object.keys(otherConfig.servers || {}).includes(currentId);
+        const hasConflict = Object.keys(otherConfig.servers || {}).includes(
+          currentId,
+        );
         setOtherSideHasConflict(hasConflict);
       } catch (error) {
         console.error("检查另一侧 MCP 配置失败:", error);
@@ -707,7 +713,9 @@ const McpFormModal: React.FC<McpFormModalProps> = ({
               <label
                 htmlFor={syncCheckboxId}
                 className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none"
-                title={t("mcp.form.syncOtherSideHint", { target: syncTargetLabel })}
+                title={t("mcp.form.syncOtherSideHint", {
+                  target: syncTargetLabel,
+                })}
               >
                 {t("mcp.form.syncOtherSide", { target: syncTargetLabel })}
               </label>
@@ -716,7 +724,9 @@ const McpFormModal: React.FC<McpFormModalProps> = ({
               <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
                 <AlertTriangle size={14} />
                 <span className="text-xs font-medium">
-                  {t("mcp.form.willOverwriteWarning", { target: syncTargetLabel })}
+                  {t("mcp.form.willOverwriteWarning", {
+                    target: syncTargetLabel,
+                  })}
                 </span>
               </div>
             )}

@@ -13,13 +13,15 @@ interface FactoryCustomModel {
 }
 
 interface FactoryModelsListProps {
-  onNotify?: (message: string, type: 'success' | 'error') => void;
+  onNotify?: (message: string, type: "success" | "error") => void;
 }
 
 const FactoryModelsList: React.FC<FactoryModelsListProps> = ({ onNotify }) => {
   const [models, setModels] = useState<FactoryCustomModel[]>([]);
   const [loading, setLoading] = useState(false);
-  const [editingModel, setEditingModel] = useState<FactoryCustomModel | null>(null);
+  const [editingModel, setEditingModel] = useState<FactoryCustomModel | null>(
+    null,
+  );
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // 加载 Factory 自定义模型
@@ -39,7 +41,7 @@ const FactoryModelsList: React.FC<FactoryModelsListProps> = ({ onNotify }) => {
   // 删除模型
   const handleDelete = async (modelDisplayName: string) => {
     if (!confirm(`确定要删除 "${modelDisplayName}" 吗？`)) return;
-    
+
     try {
       await window.api.deleteFactoryCustomModel(modelDisplayName);
       await loadFactoryModels();
@@ -59,10 +61,13 @@ const FactoryModelsList: React.FC<FactoryModelsListProps> = ({ onNotify }) => {
   // 保存编辑
   const handleSaveEdit = async () => {
     if (!editingModel) return;
-    
+
     try {
       // 这里应该有一个编辑表单，暂时简化处理
-      await window.api.updateFactoryCustomModel(editingModel.model_display_name, editingModel);
+      await window.api.updateFactoryCustomModel(
+        editingModel.model_display_name,
+        editingModel,
+      );
       await loadFactoryModels();
       setIsEditModalOpen(false);
       setEditingModel(null);
@@ -97,7 +102,7 @@ const FactoryModelsList: React.FC<FactoryModelsListProps> = ({ onNotify }) => {
           className={buttonStyles.icon}
           title="刷新"
         >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
 
@@ -107,7 +112,7 @@ const FactoryModelsList: React.FC<FactoryModelsListProps> = ({ onNotify }) => {
             key={model.model_display_name}
             className={cn(
               cardStyles.interactive,
-              "bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/20"
+              "bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/20",
             )}
           >
             <div className="flex items-center justify-between">
@@ -120,7 +125,7 @@ const FactoryModelsList: React.FC<FactoryModelsListProps> = ({ onNotify }) => {
                     Factory Config
                   </span>
                 </div>
-                
+
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                     <span className="font-medium">模型 ID:</span>
@@ -128,21 +133,21 @@ const FactoryModelsList: React.FC<FactoryModelsListProps> = ({ onNotify }) => {
                       {model.model}
                     </span>
                   </div>
-                  
+
                   <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                     <span className="font-medium">Base URL:</span>
                     <span className="text-gray-900 dark:text-gray-100 text-xs truncate max-w-xs">
                       {model.base_url}
                     </span>
                   </div>
-                  
+
                   <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                     <span className="font-medium">API Key:</span>
                     <span className="font-mono text-gray-500 dark:text-gray-400 text-xs">
                       {model.api_key.slice(0, 10)}...{model.api_key.slice(-6)}
                     </span>
                   </div>
-                  
+
                   {model.supports_prompt_caching && (
                     <div className="text-xs text-green-600 dark:text-green-400">
                       ✓ 支持 Prompt Caching
@@ -164,7 +169,7 @@ const FactoryModelsList: React.FC<FactoryModelsListProps> = ({ onNotify }) => {
                   onClick={() => handleDelete(model.model_display_name)}
                   className={cn(
                     buttonStyles.icon,
-                    "text-gray-500 hover:text-red-500 hover:bg-red-100 dark:text-gray-400 dark:hover:text-red-400 dark:hover:bg-red-500/10"
+                    "text-gray-500 hover:text-red-500 hover:bg-red-100 dark:text-gray-400 dark:hover:text-red-400 dark:hover:bg-red-500/10",
                   )}
                   title="删除"
                 >
@@ -181,29 +186,43 @@ const FactoryModelsList: React.FC<FactoryModelsListProps> = ({ onNotify }) => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
             <h3 className="text-lg font-semibold mb-4">编辑模型</h3>
-            
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">显示名称</label>
+                <label className="block text-sm font-medium mb-1">
+                  显示名称
+                </label>
                 <input
                   type="text"
                   value={editingModel.model_display_name}
-                  onChange={(e) => setEditingModel({...editingModel, model_display_name: e.target.value})}
+                  onChange={(e) =>
+                    setEditingModel({
+                      ...editingModel,
+                      model_display_name: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium mb-1">API Key</label>
+                <label className="block text-sm font-medium mb-1">
+                  API Key
+                </label>
                 <input
                   type="text"
                   value={editingModel.api_key}
-                  onChange={(e) => setEditingModel({...editingModel, api_key: e.target.value})}
+                  onChange={(e) =>
+                    setEditingModel({
+                      ...editingModel,
+                      api_key: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 font-mono text-sm"
                 />
               </div>
             </div>
-            
+
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => {
@@ -214,10 +233,7 @@ const FactoryModelsList: React.FC<FactoryModelsListProps> = ({ onNotify }) => {
               >
                 取消
               </button>
-              <button
-                onClick={handleSaveEdit}
-                className={buttonStyles.primary}
-              >
+              <button onClick={handleSaveEdit} className={buttonStyles.primary}>
                 保存
               </button>
             </div>

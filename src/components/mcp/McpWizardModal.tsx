@@ -173,8 +173,7 @@ const McpWizardModal: React.FC<McpWizardModalProps> = ({
     setWizardTitle(title);
 
     const resolvedType =
-      initialServer?.type ??
-      (initialServer?.url ? "http" : "stdio");
+      initialServer?.type ?? (initialServer?.url ? "http" : "stdio");
 
     setWizardType(resolvedType);
 
@@ -203,7 +202,9 @@ const McpWizardModal: React.FC<McpWizardModalProps> = ({
     setWizardArgs(Array.isArray(argsValue) ? argsValue.join("\n") : "");
     const envCandidate = initialServer?.env;
     const env =
-      envCandidate && typeof envCandidate === "object" ? envCandidate : undefined;
+      envCandidate && typeof envCandidate === "object"
+        ? envCandidate
+        : undefined;
     setWizardEnv(
       env
         ? Object.entries(env)

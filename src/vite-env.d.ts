@@ -147,19 +147,30 @@ declare global {
       getFactoryApiKeyEnv: () => Promise<string | null>;
       removeFactoryApiKeyEnv: () => Promise<boolean>;
       fetchDroidBalance: (apiKey: string) => Promise<any>;
-    fetchMultipleDroidBalances: (apiKeys: string[]) => Promise<any[]>;
-    autoSwitchDroidKey: (providerId: string) => Promise<number>;
-    getFactoryConfig: () => Promise<import("./types").DroidConfig>;
-    saveFactoryConfig: (config: import("./types").DroidConfig) => Promise<void>;
-    getFactoryCustomModels: () => Promise<any[]>;
-    deleteFactoryCustomModel: (modelDisplayName: string) => Promise<void>;
-    updateFactoryCustomModel: (oldDisplayName: string, model: any) => Promise<void>;
-    // Droid 会话历史管理
-    getDroidSessions: () => Promise<import("./types").DroidSession[]>;
-    getDroidSessionCommand: (sessionId: string, workingDir?: string) => Promise<string>;
-    copyToClipboard: (text: string) => Promise<void>;
-    openDroidInTerminal: (sessionId: string, workingDir?: string) => Promise<void>;
-    deleteDroidSession: (sessionId: string) => Promise<void>;
+      fetchMultipleDroidBalances: (apiKeys: string[]) => Promise<any[]>;
+      autoSwitchDroidKey: (providerId: string) => Promise<number>;
+      getFactoryConfig: () => Promise<import("./types").DroidConfig>;
+      saveFactoryConfig: (
+        config: import("./types").DroidConfig,
+      ) => Promise<void>;
+      getFactoryCustomModels: () => Promise<any[]>;
+      deleteFactoryCustomModel: (modelDisplayName: string) => Promise<void>;
+      updateFactoryCustomModel: (
+        oldDisplayName: string,
+        model: any,
+      ) => Promise<void>;
+      // Droid 会话历史管理
+      getDroidSessions: () => Promise<import("./types").DroidSession[]>;
+      getDroidSessionCommand: (
+        sessionId: string,
+        workingDir?: string,
+      ) => Promise<string>;
+      copyToClipboard: (text: string) => Promise<void>;
+      openDroidInTerminal: (
+        sessionId: string,
+        workingDir?: string,
+      ) => Promise<void>;
+      deleteDroidSession: (sessionId: string) => Promise<void>;
     };
     platform: {
       isMac: boolean;
