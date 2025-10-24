@@ -1,6 +1,6 @@
 {
   "name": "ccd-switch",
-  "version": "3.5.8",
+  "version": "3.5.9",
   "description": "Claude Code & Codex 供应商切换工具",
   "scripts": {
     "dev": "pnpm tauri dev",
