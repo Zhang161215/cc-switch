@@ -13,6 +13,8 @@ export interface DroidProviderPreset {
   max_tokens?: number;
   supports_prompt_caching?: boolean;
   isOfficial?: boolean;
+  // 新增：droid2api 请求地址候选列表
+  droid2apiCandidates?: string[];
 }
 
 export const droidProviderPresets: DroidProviderPreset[] = [
@@ -27,6 +29,10 @@ export const droidProviderPresets: DroidProviderPreset[] = [
     max_tokens: 200000,
     supports_prompt_caching: true,
     isOfficial: true,
+    droid2apiCandidates: [
+      "https://droid-cc.xie-xuhuaimu.workers.dev",
+      "http://127.0.0.1:3000",
+    ],
   },
   {
     name: "Droid Official (Opus 4.1)",
@@ -39,6 +45,10 @@ export const droidProviderPresets: DroidProviderPreset[] = [
     max_tokens: 200000,
     supports_prompt_caching: true,
     isOfficial: true,
+    droid2apiCandidates: [
+      "https://droid-cc.xie-xuhuaimu.workers.dev",
+      "http://127.0.0.1:3000",
+    ],
   },
   {
     name: "Custom API",
@@ -47,5 +57,9 @@ export const droidProviderPresets: DroidProviderPreset[] = [
     model: "",
     model_display_name: "",
     provider: "anthropic",
+    droid2apiCandidates: [
+      "https://droid-cc.xie-xuhuaimu.workers.dev",
+      "http://127.0.0.1:3000",
+    ],
   },
 ];

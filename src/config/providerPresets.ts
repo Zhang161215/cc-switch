@@ -105,64 +105,21 @@ export const providerPresets: ProviderPreset[] = [
     category: "aggregator",
   },
   {
-    name: "KAT-Coder",
-    websiteUrl: "https://console.streamlake.ai/wanqing/",
-    apiKeyUrl: "https://console.streamlake.ai/console/wanqing/api-key",
+    name: "Droid2Api",
+    websiteUrl: "https://factory.ai",
+    apiKeyUrl: "https://factory.ai/settings",
     settingsConfig: {
       env: {
-        ANTHROPIC_BASE_URL:
-          "https://vanchin.streamlake.ai/api/gateway/v1/endpoints/${ENDPOINT_ID}/claude-code-proxy",
+        ANTHROPIC_BASE_URL: "https://droid-cc.xie-xuhuaimu.workers.dev",
         ANTHROPIC_AUTH_TOKEN: "",
-        ANTHROPIC_MODEL: "KAT-Coder",
-        ANTHROPIC_SMALL_FAST_MODEL: "KAT-Coder",
+        ANTHROPIC_MODEL: "claude-sonnet-4-5-20250929",
+        ANTHROPIC_SMALL_FAST_MODEL: "claude-sonnet-4-5-20250929",
       },
     },
-    category: "cn_official",
-    templateValues: {
-      ENDPOINT_ID: {
-        label: "Vanchin Endpoint ID",
-        placeholder: "ep-xxx-xxx",
-        defaultValue: "",
-        editorValue: "",
-      },
-    },
-  },
-  {
-    name: "Longcat",
-    websiteUrl: "https://longcat.chat/platform",
-    apiKeyUrl: "https://longcat.chat/platform/api_keys",
-    settingsConfig: {
-      env: {
-        ANTHROPIC_BASE_URL: "https://api.longcat.chat/anthropic",
-        ANTHROPIC_AUTH_TOKEN: "",
-        ANTHROPIC_MODEL: "LongCat-Flash-Chat",
-        ANTHROPIC_SMALL_FAST_MODEL: "LongCat-Flash-Chat",
-        ANTHROPIC_DEFAULT_SONNET_MODEL: "LongCat-Flash-Chat",
-        ANTHROPIC_DEFAULT_OPUS_MODEL: "LongCat-Flash-Chat",
-        CLAUDE_CODE_MAX_OUTPUT_TOKENS: "6000",
-        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: 1,
-      },
-    },
-    category: "cn_official",
-  },
-  {
-    name: "PackyCode",
-    websiteUrl: "https://www.packycode.com",
-    apiKeyUrl: "https://www.packycode.com/?aff=rlo54mgz",
-    settingsConfig: {
-      env: {
-        ANTHROPIC_BASE_URL: "https://api.packycode.com",
-        ANTHROPIC_AUTH_TOKEN: "",
-      },
-    },
-    // 请求地址候选（用于地址管理/测速）
-    endpointCandidates: [
-      "https://api.packycode.com",
-      "https://api-hk-cn2.packycode.com",
-      "https://api-hk-g.packycode.com",
-      "https://api-us-cn2.packycode.com",
-      "https://api-cf-pro.packycode.com",
-    ],
     category: "third_party",
+    endpointCandidates: [
+      "https://droid-cc.xie-xuhuaimu.workers.dev",
+      "http://127.0.0.1:3000",
+    ],
   },
 ];

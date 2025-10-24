@@ -64,21 +64,4 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     },
     config: ``,
   },
-  {
-    name: "PackyCode",
-    websiteUrl: "https://codex.packycode.com/",
-    category: "third_party",
-    auth: generateThirdPartyAuth("sk-your-api-key-here"),
-    config: generateThirdPartyConfig(
-      "packycode",
-      "https://codex-api.packycode.com/v1",
-      "gpt-5-codex",
-    ),
-    // Codex 请求地址候选（用于地址管理/测速）
-    endpointCandidates: [
-      "https://codex-api.packycode.com/v1",
-      "https://codex-api-hk-cn2.packycode.com/v1",
-      "https://codex-api-hk-cdn.packycode.com/v1",
-    ],
-  },
 ];

@@ -166,6 +166,7 @@ export interface DroidProvider {
   }; // 缓存的余额信息
   is_invalid?: boolean; // 标识账号是否已失效（401错误）
   refresh_interval?: number; // 余额刷新间隔（分钟），默认60分钟
+  droid2api_url?: string; // 选择的 droid2api 请求地址
 }
 
 // Droid 会话历史
