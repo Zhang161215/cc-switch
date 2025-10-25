@@ -53,6 +53,10 @@ pub struct KeyBalance {
     pub used_ratio: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_checked: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_date: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_date: Option<i64>,
 }
 
 /// 切换策略
@@ -100,6 +104,8 @@ pub struct DroidProvider {
     pub balance: Option<KeyBalance>, // 缓存的余额信息
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_invalid: Option<bool>, // 标识账号是否已失效（401错误）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_interval: Option<i64>, // 自动刷新间隔（分钟）
 }
 
 /// Get the Factory config directory path

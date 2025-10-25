@@ -163,6 +163,8 @@ export interface DroidProvider {
     remaining: number;
     used_ratio: number;
     last_checked?: number;
+    start_date?: number; // 计费周期开始时间（毫秒时间戳）
+    end_date?: number; // 到期时间（毫秒时间戳）
   }; // 缓存的余额信息
   is_invalid?: boolean; // 标识账号是否已失效（401错误）
   refresh_interval?: number; // 余额刷新间隔（分钟），默认60分钟

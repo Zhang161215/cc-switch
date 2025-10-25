@@ -10,6 +10,8 @@ interface BalanceInfo {
     totalUsed: number;
     remaining: number;
     usedRatio: number;
+    startDate?: number;
+    endDate?: number;
   };
   error?: string;
 }
@@ -88,6 +90,14 @@ const BatchPreviewModal: React.FC<BatchPreviewModalProps> = ({
         const totalUsed = data.usage?.standard?.orgTotalTokensUsed || 0;
         const remaining = Math.max(0, totalAllowance - totalUsed);
         const usedRatio = totalAllowance > 0 ? totalUsed / totalAllowance : 0;
+        const startDate = data.usage?.startDate;
+        // 尝试多个可能的到期时间字段名
+        const endDate = data.usage?.endDate 
+          || data.usage?.expiresAt 
+          || data.usage?.expiryDate 
+          || data.usage?.validUntil 
+          || data.usage?.end_date
+          || data.usage?.expires_at;
 
         setPreviewProviders(prev => {
           const newPrev = [...prev];
@@ -95,7 +105,7 @@ const BatchPreviewModal: React.FC<BatchPreviewModalProps> = ({
             ...newPrev[index],
             balance: {
               status: 'success',
-              data: { totalAllowance, totalUsed, remaining, usedRatio }
+              data: { totalAllowance, totalUsed, remaining, usedRatio, startDate, endDate }
             }
           };
           return newPrev;

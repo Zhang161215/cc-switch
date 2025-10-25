@@ -154,6 +154,7 @@ function App() {
   const loadDroidProviders = async () => {
     try {
       const providers = await window.api.getDroidProviders();
+      console.log("[loadDroidProviders] 加载的 providers:", providers);
 
       // 优先从环境变量获取当前使用的 Key
       const envApiKey = await window.api.getFactoryApiKeyEnv();
@@ -167,6 +168,7 @@ function App() {
           console.log(
             `从环境变量匹配到 provider: ${matchedProvider.name} (${currentId})`,
           );
+          console.log(`refresh_interval: ${matchedProvider.refresh_interval}`);
         } else {
           console.warn("环境变量中的 API Key 在列表中未找到");
         }
@@ -399,8 +401,11 @@ function App() {
   ) => {
     try {
       console.log("[Frontend] Updating provider:", provider);
+      console.log("[Frontend] refresh_interval:", provider.refresh_interval);
       await window.api.updateDroidProvider(provider);
+      console.log("[Frontend] 后端更新完成，开始重新加载");
       await loadDroidProviders();
+      console.log("[Frontend] 重新加载完成");
       // 只在有编辑模态框时才关闭
       if (editingDroidProvider) {
         setEditingDroidProvider(null);
