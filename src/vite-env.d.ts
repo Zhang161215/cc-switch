@@ -171,6 +171,23 @@ declare global {
         workingDir?: string,
       ) => Promise<void>;
       deleteDroidSession: (sessionId: string) => Promise<void>;
+      // 备份管理
+      getBackupStatus: () => Promise<{
+        has_today_backup: boolean;
+        last_backup?: {
+          timestamp: number;
+          file_size: number;
+          checksum: string;
+          backup_path: string;
+        };
+        total_backups: number;
+      }>;
+      createManualBackup: () => Promise<{
+        timestamp: number;
+        file_size: number;
+        checksum: string;
+        backup_path: string;
+      }>;
     };
     platform: {
       isMac: boolean;

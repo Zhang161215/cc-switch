@@ -2335,3 +2335,57 @@ end tell"#,
         Err("当前平台不支持自动打开终端".to_string())
     }
 }
+
+// ============================================
+// 备份管理相关命令
+// ============================================
+
+use serde::{Deserialize, Serialize};
+
+/// 备份状态信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackupStatus {
+    /// 今天是否已有备份
+    pub has_today_backup: bool,
+    /// 最后一次备份的信息
+    pub last_backup: Option<crate::config_backup::BackupMetadata>,
+    /// 总备份数量
+    pub total_backups: usize,
+}
+
+/// 获取今天的备份状态
+#[tauri::command]
+pub async fn get_backup_status() -> Result<BackupStatus, String> {
+    use crate::app_config::MultiAppConfig;
+    use crate::config_backup::ConfigBackupManager;
+    use crate::config::get_app_config_path;
+
+    let config_path = get_app_config_path();
+    let backup_manager = ConfigBackupManager::new(config_path);
+
+    // 获取所有备份
+    let backups = backup_manager.list_backups()?;
+
+    // 检查是否有今天的备份
+    let has_today_backup = !backup_manager.should_create_backup()?;
+
+    Ok(BackupStatus {
+        has_today_backup,
+        last_backup: backups.first().cloned(),
+        total_backups: backups.len(),
+    })
+}
+
+/// 手动创建备份
+#[tauri::command]
+pub async fn create_manual_backup(
+    state: State<'_, AppState>,
+) -> Result<crate::config_backup::BackupMetadata, String> {
+    use crate::config::get_app_config_path;
+    use crate::config_backup::ConfigBackupManager;
+
+    let config_path = get_app_config_path();
+    let backup_manager = ConfigBackupManager::new(config_path);
+
+    backup_manager.create_backup()
+}

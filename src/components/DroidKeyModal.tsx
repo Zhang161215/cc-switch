@@ -30,7 +30,9 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
 
   // 批量添加预览状态
   const [showBatchPreview, setShowBatchPreview] = useState(false);
-  const [validatedProviders, setValidatedProviders] = useState<DroidProvider[]>([]);
+  const [validatedProviders, setValidatedProviders] = useState<DroidProvider[]>(
+    [],
+  );
 
   const [formData, setFormData] = useState<DroidProvider>(
     provider || {
@@ -158,7 +160,7 @@ const DroidKeyModal: React.FC<DroidKeyModalProps> = ({
       setShowBatchPreview(false);
       setTimeout(() => {
         onClose();
-        setBatchKeysText('');
+        setBatchKeysText("");
         setValidatedProviders([]);
         setBatchAddResults(null);
       }, 500);

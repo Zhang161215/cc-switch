@@ -64,7 +64,9 @@ const DroidProviderList = forwardRef<
   ) => {
     const [balances, setBalances] = useState<Record<string, BalanceInfo>>({});
     const [refreshing, setRefreshing] = useState<Record<string, boolean>>({});
-    const [sortBy, setSortBy] = useState<"default" | "expiry" | "remaining">("default");
+    const [sortBy, setSortBy] = useState<"default" | "expiry" | "remaining">(
+      "default",
+    );
 
     // 获取余额信息
     const fetchBalance = async (provider: DroidProvider) => {
@@ -90,7 +92,10 @@ const DroidProviderList = forwardRef<
         const data = await window.api.fetchDroidBalance(provider.api_key);
         console.log("=== 完整 API 响应 ===");
         console.log(JSON.stringify(data, null, 2));
-        console.log("data.usage 的所有字段:", data.usage ? Object.keys(data.usage) : 'null');
+        console.log(
+          "data.usage 的所有字段:",
+          data.usage ? Object.keys(data.usage) : "null",
+        );
 
         if (data.usage && data.usage.standard) {
           totalAllowance = data.usage.standard.totalAllowance || 0;
@@ -100,25 +105,34 @@ const DroidProviderList = forwardRef<
         // 提取时间信息 - 尝试多种可能的字段名
         if (data.usage) {
           startDate = data.usage.startDate;
-          
+
           // 尝试多个可能的到期时间字段名
-          endDate = data.usage.endDate 
-            || data.usage.expiresAt 
-            || data.usage.expiryDate 
-            || data.usage.validUntil 
-            || data.usage.end_date
-            || data.usage.expires_at;
-          
+          endDate =
+            data.usage.endDate ||
+            data.usage.expiresAt ||
+            data.usage.expiryDate ||
+            data.usage.validUntil ||
+            data.usage.end_date ||
+            data.usage.expires_at;
+
           console.log("=== 时间数据提取 ===");
-          console.log("startDate:", startDate, startDate ? new Date(startDate) : 'undefined');
-          console.log("endDate (已提取):", endDate, endDate ? new Date(endDate) : 'undefined');
+          console.log(
+            "startDate:",
+            startDate,
+            startDate ? new Date(startDate) : "undefined",
+          );
+          console.log(
+            "endDate (已提取):",
+            endDate,
+            endDate ? new Date(endDate) : "undefined",
+          );
           console.log("原始字段:", {
             endDate: data.usage.endDate,
             expiresAt: data.usage.expiresAt,
             expiryDate: data.usage.expiryDate,
             validUntil: data.usage.validUntil,
             end_date: data.usage.end_date,
-            expires_at: data.usage.expires_at
+            expires_at: data.usage.expires_at,
           });
         } else {
           console.log("data.usage 为空:", data);
@@ -147,7 +161,10 @@ const DroidProviderList = forwardRef<
             [provider.id]: balanceData,
           };
           console.log("=== setBalances 后的新 state ===");
-          console.log("newBalances[provider.id].end_date:", newBalances[provider.id].end_date);
+          console.log(
+            "newBalances[provider.id].end_date:",
+            newBalances[provider.id].end_date,
+          );
           return newBalances;
         });
 
@@ -503,7 +520,7 @@ const DroidProviderList = forwardRef<
         {(() => {
           // 排序逻辑
           let sortedProviders = [...providers];
-          
+
           if (sortBy === "expiry") {
             sortedProviders.sort((a, b) => {
               const balanceA = balances[a.id];
@@ -525,7 +542,7 @@ const DroidProviderList = forwardRef<
               return remainingB - remainingA; // 降序，剩余多的排前面
             });
           }
-          
+
           return sortedProviders;
         })().map((provider) => {
           const isCurrent = provider.id === currentProviderId;
@@ -546,20 +563,30 @@ const DroidProviderList = forwardRef<
                       {provider.name}
                     </h3>
                     {/* 到期日期显示在名称后面 */}
-                    {balance?.end_date && (() => {
-                      const now = Date.now();
-                      const daysLeft = Math.ceil((balance.end_date - now) / (1000 * 60 * 60 * 24));
-                      const colorClass = daysLeft < 7 
-                        ? "text-red-600 dark:text-red-400"
-                        : daysLeft < 30
-                        ? "text-yellow-600 dark:text-yellow-400"
-                        : "text-green-600 dark:text-green-400";
-                      return (
-                        <span className={cn("text-xs font-medium", colorClass)}>
-                          到期: {new Date(balance.end_date).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })}
-                        </span>
-                      );
-                    })()}
+                    {balance?.end_date &&
+                      (() => {
+                        const now = Date.now();
+                        const daysLeft = Math.ceil(
+                          (balance.end_date - now) / (1000 * 60 * 60 * 24),
+                        );
+                        const colorClass =
+                          daysLeft < 7
+                            ? "text-red-600 dark:text-red-400"
+                            : daysLeft < 30
+                              ? "text-yellow-600 dark:text-yellow-400"
+                              : "text-green-600 dark:text-green-400";
+                        return (
+                          <span
+                            className={cn("text-xs font-medium", colorClass)}
+                          >
+                            到期:{" "}
+                            {new Date(balance.end_date).toLocaleDateString(
+                              "zh-CN",
+                              { month: "2-digit", day: "2-digit" },
+                            )}
+                          </span>
+                        );
+                      })()}
                     <div
                       className={cn(
                         badgeStyles.success,
@@ -593,8 +620,8 @@ const DroidProviderList = forwardRef<
                           <div className="flex items-center gap-3">
                             <div className="text-xs text-gray-500 dark:text-gray-400">
                               已用 {(balance.totalUsed / 1000000).toFixed(1)}M /
-                              总额 {(balance.totalAllowance / 1000000).toFixed(1)}
-                              M
+                              总额{" "}
+                              {(balance.totalAllowance / 1000000).toFixed(1)}M
                             </div>
                             <div
                               className={cn(
@@ -638,16 +665,19 @@ const DroidProviderList = forwardRef<
                         余额查询失败: {balance.error}
                       </div>
                     )}
-                    
+
                     {/* 刷新间隔选择器 - 仅当前使用的key显示 */}
                     {isCurrent && (
-                      <div 
+                      <div
                         className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700"
                         onClick={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center gap-2">
-                          <RefreshCw size={14} className="text-gray-500 dark:text-gray-400" />
+                          <RefreshCw
+                            size={14}
+                            className="text-gray-500 dark:text-gray-400"
+                          />
                           <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
                             自动刷新间隔:
                           </span>
@@ -664,7 +694,10 @@ const DroidProviderList = forwardRef<
                                   ...provider,
                                   refresh_interval: newValue,
                                 };
-                                console.log("更新后的 provider:", updatedProvider);
+                                console.log(
+                                  "更新后的 provider:",
+                                  updatedProvider,
+                                );
                                 onUpdate(updatedProvider, true);
                               }
                             }}

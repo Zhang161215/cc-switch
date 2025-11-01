@@ -159,15 +159,22 @@ impl MultiAppConfig {
         serde_json::from_str::<Self>(&content).map_err(|e| format!("解析配置文件失败: {}", e))
     }
 
-    /// 保存配置到文件（使用增强的备份机制）
+    /// 保存配置到文件（使用智能备份机制：每天只备份一次）
     pub fn save(&self) -> Result<(), String> {
         let config_path = get_app_config_path();
-        
-        // 使用备份管理器的安全保存功能
+
+        // 使用智能备份：每天只创建一次
         let backup_manager = crate::config_backup::ConfigBackupManager::new(config_path.clone());
-        backup_manager.safe_save(self)?;
-        
-        log::info!("💾 配置已安全保存并创建备份");
+        let _ = backup_manager.smart_backup(); // 忽略备份结果，备份失败不影响保存
+
+        // 序列化并保存配置
+        let json_content = serde_json::to_string_pretty(self)
+            .map_err(|e| format!("序列化配置失败: {}", e))?;
+
+        std::fs::write(&config_path, &json_content)
+            .map_err(|e| format!("保存配置失败: {}", e))?;
+
+        log::info!("💾 配置已保存");
         Ok(())
     }
     

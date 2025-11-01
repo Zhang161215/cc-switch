@@ -19,6 +19,7 @@ import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppSwitcher } from "./components/AppSwitcher";
 import SettingsModal from "./components/SettingsModal";
 import { UpdateBadge } from "./components/UpdateBadge";
+import { BackupStatusBadge } from "./components/BackupStatusBadge";
 import { Plus, Settings, Moon, Sun, Key } from "lucide-react";
 import McpPanel from "./components/mcp/McpPanel";
 import { buttonStyles } from "./lib/styles";
@@ -500,6 +501,7 @@ function App() {
                 <Settings size={18} />
               </button>
               <UpdateBadge onClick={() => setIsSettingsOpen(true)} />
+              <BackupStatusBadge />
             </div>
           </div>
 

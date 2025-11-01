@@ -34,6 +34,21 @@ export interface EndpointLatencyResult {
   error?: string;
 }
 
+// 备份元数据
+export interface BackupMetadata {
+  timestamp: number;
+  file_size: number;
+  checksum: string;
+  backup_path: string;
+}
+
+// 备份状态
+export interface BackupStatus {
+  has_today_backup: boolean;
+  last_backup?: BackupMetadata;
+  total_backups: number;
+}
+
 // Tauri API 封装，提供统一的全局 API 接口
 export const tauriAPI = {
   // 获取所有供应商
@@ -857,6 +872,30 @@ export const tauriAPI = {
       await invoke("delete_droid_session", { sessionId });
     } catch (error) {
       console.error("删除会话失败:", error);
+      throw error;
+    }
+  },
+
+  // ============================================
+  // 备份管理 API
+  // ============================================
+
+  // 获取备份状态
+  getBackupStatus: async (): Promise<BackupStatus> => {
+    try {
+      return await invoke("get_backup_status");
+    } catch (error) {
+      console.error("获取备份状态失败:", error);
+      throw error;
+    }
+  },
+
+  // 手动创建备份
+  createManualBackup: async (): Promise<BackupMetadata> => {
+    try {
+      return await invoke("create_manual_backup");
+    } catch (error) {
+      console.error("创建备份失败:", error);
       throw error;
     }
   },

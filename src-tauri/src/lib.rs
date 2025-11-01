@@ -489,6 +489,9 @@ pub fn run() {
             droid2api_service::stop_droid2api_service,
             droid2api_service::get_droid2api_service_status,
             droid2api_service::test_droid2api_connection,
+            // backup management
+            commands::get_backup_status,
+            commands::create_manual_backup,
         ]);
 
     let app = builder

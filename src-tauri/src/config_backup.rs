@@ -229,6 +229,50 @@ impl ConfigBackupManager {
         Ok(true)
     }
 
+    /// 获取今天开始的时间戳（UTC时区的今天0点）
+    fn get_today_start_timestamp() -> u64 {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        // 计算今天0点的时间戳（86400秒 = 1天）
+        now - (now % 86400)
+    }
+
+    /// 检查是否需要创建今天的备份
+    pub fn should_create_backup(&self) -> Result<bool, String> {
+        let backups = self.list_backups()?;
+
+        if backups.is_empty() {
+            return Ok(true); // 没有备份，需要创建
+        }
+
+        let today_start = Self::get_today_start_timestamp();
+
+        // 检查是否已有今天的备份
+        let has_today_backup = backups.iter()
+            .any(|b| b.timestamp >= today_start);
+
+        Ok(!has_today_backup)
+    }
+
+    /// 智能备份：每天只创建一次
+    pub fn smart_backup(&self) -> Result<Option<BackupMetadata>, String> {
+        if !self.config_path.exists() {
+            return Ok(None); // 配置文件不存在，跳过备份
+        }
+
+        if !self.should_create_backup()? {
+            log::info!("⏭️  今天已有备份，跳过");
+            return Ok(None);
+        }
+
+        let meta = self.create_backup()?;
+        log::info!("✅ 已创建今天的备份");
+        Ok(Some(meta))
+    }
+
     /// 安全保存配置（带验证和自动备份）
     pub fn safe_save<T: Serialize>(&self, config: &T) -> Result<(), String> {
         // 先创建当前配置的备份
