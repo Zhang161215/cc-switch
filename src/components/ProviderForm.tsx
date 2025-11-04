@@ -1297,9 +1297,9 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
     }
   };
 
-  // 自定义模式(-1)不显示独立的 API Key 输入框
+  // 自定义模式也需要显示 API Key 输入框
   const showCodexApiKey =
-    (selectedCodexPreset !== null && selectedCodexPreset !== -1) ||
+    selectedCodexPreset !== null ||
     (!showPresets && getCodexAuthApiKey(codexAuth) !== "");
 
   // 不再渲染分类介绍组件，避免造成干扰
@@ -1710,7 +1710,6 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
                   disabled={isCodexOfficialPreset}
                   required={
                     selectedCodexPreset !== null &&
-                    selectedCodexPreset >= 0 &&
                     !isCodexOfficialPreset
                   }
                 />
