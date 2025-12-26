@@ -95,7 +95,7 @@ jobs:
         run: |
           set -x
           mkdir -p release-assets
-          VERSION="${GITHUB_REF_NAME}"
+          VERSION="${GITHUB_REF_NAME//\//-}"
           
           # 查找 DMG 文件
           DMG=$(find src-tauri/target -name "*.dmg" -type f | head -1 || true)
@@ -125,7 +125,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release-assets | Out-Null
-          $VERSION = $env:GITHUB_REF_NAME
+          $VERSION = $env:GITHUB_REF_NAME -replace '/', '-'
           
           Write-Host "🔍 查找 Windows 可执行文件..."
           
@@ -173,7 +173,7 @@ jobs:
         run: |
           set -x
           mkdir -p release-assets
-          VERSION="${GITHUB_REF_NAME}"
+          VERSION="${GITHUB_REF_NAME//\//-}"
           
           # AppImage
           APPIMAGE=$(find src-tauri/target/release/bundle -name "*.AppImage" -type f | head -1 || true)
