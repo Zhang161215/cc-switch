@@ -77,12 +77,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Install droid2api dependencies
-        run: |
-          cd droid2api
-          npm install --production
-          cd ..
-
       - name: Build Tauri App (macOS)
         if: runner.os == 'macOS'
         run: pnpm tauri build --target universal-apple-darwin

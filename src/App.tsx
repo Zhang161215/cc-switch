@@ -14,6 +14,7 @@ import {
   FactoryEnvDisplayRef,
 } from "./components/FactoryEnvDisplay";
 import DroidSessionHistory from "./components/DroidSessionHistory";
+import DroidDefaultModelSelector from "./components/DroidDefaultModelSelector";
 import FactoryConfigEditor from "./components/FactoryConfigEditor";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppSwitcher } from "./components/AppSwitcher";
@@ -549,10 +550,11 @@ function App() {
 
             {activeApp === "droid" ? (
               <>
-                {/* 会话历史按钮 */}
-                <div className="mb-4 flex justify-end">
-                  <DroidSessionHistory onNotify={showNotification} />
-                </div>
+                {/* 默认模型选择器 */}
+                <DroidDefaultModelSelector onNotify={showNotification} />
+
+                {/* 会话历史 */}
+                <DroidSessionHistory onNotify={showNotification} />
 
                 <DroidProviderList
                   ref={droidProviderListRef}
@@ -563,11 +565,12 @@ function App() {
                   onDelete={handleDeleteDroidProvider}
                   onUpdate={handleUpdateDroidProvider}
                   onNotify={showNotification}
-                />
-                <FactoryEnvDisplay
-                  ref={factoryEnvRef}
-                  currentProviderId={currentDroidProviderId}
-                />
+                >
+                  <FactoryEnvDisplay
+                    ref={factoryEnvRef}
+                    currentProviderId={currentDroidProviderId}
+                  />
+                </DroidProviderList>
                 <FactoryConfigEditor onNotify={showNotification} />
               </>
             ) : (

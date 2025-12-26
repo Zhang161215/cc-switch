@@ -188,6 +188,22 @@ declare global {
         checksum: string;
         backup_path: string;
       }>;
+      // Droid 默认模型和会话模型管理
+      getDroidDefaultModel: () => Promise<string | null>;
+      setDroidDefaultModel: (
+        model: string,
+        reasoningEffort?: string,
+        autonomyMode?: string,
+      ) => Promise<void>;
+      getDroidSessionModel: (sessionId: string) => Promise<string | null>;
+      setDroidSessionModel: (
+        sessionId: string,
+        model: string,
+        providerLock?: string,
+        reasoningEffort?: string,
+        autonomyMode?: string,
+      ) => Promise<void>;
+      getDroidSessionSettings: (sessionId: string) => Promise<any>;
     };
     platform: {
       isMac: boolean;

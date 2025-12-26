@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { DroidSession } from "../types";
+import { DroidSession, DroidCustomModel } from "../types";
 import {
   History,
   Terminal,
@@ -9,6 +9,11 @@ import {
   Zap,
   Trash2,
   AlertTriangle,
+  Settings,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  Folder,
 } from "lucide-react";
 import { buttonStyles, cardStyles, cn } from "../lib/styles";
 
@@ -24,6 +29,15 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [expandedSettingsId, setExpandedSettingsId] = useState<string | null>(null);
+  const [customModels, setCustomModels] = useState<DroidCustomModel[]>([]);
+  const [sessionSettings, setSessionSettings] = useState<Record<string, {
+    selectedModel: string;
+    reasoningEffort: string;
+    autonomyMode: string;
+    providerLock: string;
+  }>>({});
+  const [savingModel, setSavingModel] = useState(false);
 
   // 加载会话历史
   const loadSessions = async () => {
@@ -42,8 +56,95 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadSessions();
+      loadCustomModels();
     }
   }, [isOpen]);
+
+  // 加载自定义模型
+  const loadCustomModels = async () => {
+    try {
+      const models = await window.api.getFactoryCustomModels();
+      setCustomModels(models);
+    } catch (error) {
+      console.error("加载自定义模型失败:", error);
+    }
+  };
+
+  // 构建模型ID
+  const buildModelId = (model: DroidCustomModel, index: number): string => {
+    return `custom:${model.model_display_name}-${index}`;
+  };
+
+  // 切换展开会话设置
+  const toggleSessionSettings = async (sessionId: string) => {
+    if (expandedSettingsId === sessionId) {
+      setExpandedSettingsId(null);
+      return;
+    }
+    
+    // 加载会话设置
+    try {
+      const settings = await window.api.getDroidSessionSettings(sessionId);
+      setSessionSettings(prev => ({
+        ...prev,
+        [sessionId]: {
+          selectedModel: settings.model || "",
+          reasoningEffort: settings.reasoningEffort || "high",
+          autonomyMode: settings.autonomyMode || "auto-high",
+          providerLock: settings.providerLock || "anthropic",
+        }
+      }));
+    } catch (error) {
+      console.error("加载会话设置失败:", error);
+      setSessionSettings(prev => ({
+        ...prev,
+        [sessionId]: {
+          selectedModel: "",
+          reasoningEffort: "high",
+          autonomyMode: "auto-high",
+          providerLock: "anthropic",
+        }
+      }));
+    }
+    setExpandedSettingsId(sessionId);
+  };
+
+  // 更新会话设置
+  const updateSessionSetting = (sessionId: string, key: string, value: string) => {
+    setSessionSettings(prev => ({
+      ...prev,
+      [sessionId]: {
+        ...prev[sessionId],
+        [key]: value,
+      }
+    }));
+  };
+
+  // 保存会话模型设置
+  const saveSessionModel = async (sessionId: string) => {
+    const settings = sessionSettings[sessionId];
+    if (!settings || !settings.selectedModel) {
+      onNotify?.("请选择一个模型", "error");
+      return;
+    }
+
+    setSavingModel(true);
+    try {
+      await window.api.setDroidSessionModel(
+        sessionId,
+        settings.selectedModel,
+        settings.providerLock,
+        settings.reasoningEffort,
+        settings.autonomyMode,
+      );
+      onNotify?.("会话模型设置成功", "success");
+      setExpandedSettingsId(null);
+    } catch (error) {
+      onNotify?.(`设置失败: ${error}`, "error");
+    } finally {
+      setSavingModel(false);
+    }
+  };
 
   // 复制命令到剪贴板
   const copyCommand = async (sessionId: string) => {
@@ -138,56 +239,59 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
     return num.toString();
   };
 
-  if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className={cn(buttonStyles.secondary, "flex items-center gap-2")}
-      >
-        <History size={16} />
-        会话历史
-      </button>
-    );
-  }
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-4xl max-h-[80vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-3">
-            <History size={24} className="text-blue-500" />
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                会话历史
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                选择会话打开或复制命令
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+    <div className="mb-4">
+      {/* 可折叠标题 */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "w-full flex items-center justify-between p-3 rounded-lg border transition-all",
+          "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+          "hover:border-blue-300 dark:hover:border-blue-600",
+        )}
+      >
+        <div className="flex items-center gap-2">
+          <History size={16} className="text-blue-500" />
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            会话历史
+          </span>
+          {sessions.length > 0 && (
+            <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
+              {sessions.length} 个
+            </span>
+          )}
         </div>
+        {isOpen ? (
+          <ChevronUp size={16} className="text-gray-400" />
+        ) : (
+          <ChevronDown size={16} className="text-gray-400" />
+        )}
+      </button>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+      {/* 可折叠内容 */}
+      {isOpen && (
+        <div className="mt-2 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+          {/* 刷新按钮 */}
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              共 {sessions.length} 个会话
+            </span>
+            <button
+              onClick={loadSessions}
+              disabled={loading}
+              className={cn(
+                "inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md transition-colors",
+                loading
+                  ? "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed"
+                  : "bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700",
+              )}
+            >
+              <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+              刷新
+            </button>
+          </div>
+
+          {/* 会话列表（固定高度可滚动） */}
           {loading ? (
             <div className="flex items-center justify-center h-40">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
@@ -198,8 +302,11 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
               <p>暂无会话历史</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {sessions.map((session) => (
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {sessions.map((session) => {
+                const isExpanded = expandedSettingsId === session.id;
+                const settings = sessionSettings[session.id];
+                return (
                 <div
                   key={session.id}
                   className={cn(cardStyles.interactive, "p-3")}
@@ -248,6 +355,16 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
                         </div>
                       )}
 
+                      {/* 工作目录 */}
+                      {session.working_dir && (
+                        <div className="flex items-center gap-1 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          <Folder size={11} className="text-gray-400" />
+                          <span className="truncate" title={session.working_dir}>
+                            {session.working_dir}
+                          </span>
+                        </div>
+                      )}
+
                       <div className="mt-1 font-mono text-xs text-gray-400 dark:text-gray-500">
                         {session.id}
                       </div>
@@ -284,80 +401,228 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
                       </button>
                     </div>
                   </div>
+
+                  {/* 可展开的模型设置区域 */}
+                  <button
+                    onClick={() => toggleSessionSettings(session.id)}
+                    className={cn(
+                      "w-full mt-2 flex items-center justify-between p-2 rounded-lg border transition-all",
+                      isExpanded
+                        ? "border-blue-300 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20"
+                        : "border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-600",
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Settings size={14} className="text-blue-500" />
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                        模型设置
+                      </span>
+                      {settings?.selectedModel && (
+                        <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
+                          已配置
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown
+                      size={14}
+                      className={cn(
+                        "text-gray-400 transition-transform",
+                        isExpanded && "rotate-180",
+                      )}
+                    />
+                  </button>
+
+                  {/* 展开的设置内容 */}
+                  {isExpanded && settings && (
+                    <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 space-y-3">
+                      {/* 模型选择 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                          选择自定义模型
+                        </label>
+                        <div className="grid grid-cols-1 gap-1.5 max-h-40 overflow-y-auto">
+                          {customModels.map((model, index) => {
+                            const modelId = buildModelId(model, index);
+                            const isSelected = settings.selectedModel === modelId;
+                            return (
+                              <button
+                                key={index}
+                                onClick={() => updateSessionSetting(session.id, "selectedModel", modelId)}
+                                className={cn(
+                                  "w-full flex items-center justify-between p-2 rounded-md border transition-all text-left",
+                                  isSelected
+                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                                    : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-blue-300",
+                                )}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={cn(
+                                      "text-xs font-medium truncate",
+                                      isSelected ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"
+                                    )}>
+                                      {model.model_display_name}
+                                    </span>
+                                    {isSelected && <Check size={12} className="text-blue-500 flex-shrink-0" />}
+                                  </div>
+                                </div>
+                                <span className="text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded ml-2">
+                                  {model.provider}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Provider Lock */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                          Provider Lock
+                        </label>
+                        <div className="flex gap-1.5">
+                          {["anthropic", "openai"].map((provider) => (
+                            <button
+                              key={provider}
+                              onClick={() => updateSessionSetting(session.id, "providerLock", provider)}
+                              className={cn(
+                                "px-2.5 py-1 text-xs rounded-md transition-all",
+                                settings.providerLock === provider
+                                  ? "bg-blue-500 text-white"
+                                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200",
+                              )}
+                            >
+                              {provider}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 推理级别 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                          推理级别
+                        </label>
+                        <div className="flex gap-1.5">
+                          {[
+                            { value: "off", label: "关闭" },
+                            { value: "low", label: "低" },
+                            { value: "medium", label: "中" },
+                            { value: "high", label: "高" },
+                          ].map((effort) => (
+                            <button
+                              key={effort.value}
+                              onClick={() => updateSessionSetting(session.id, "reasoningEffort", effort.value)}
+                              className={cn(
+                                "px-2.5 py-1 text-xs rounded-md transition-all",
+                                settings.reasoningEffort === effort.value
+                                  ? "bg-blue-500 text-white"
+                                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200",
+                              )}
+                            >
+                              {effort.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 自主模式 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                          自主模式
+                        </label>
+                        <div className="flex gap-1.5">
+                          {[
+                            { value: "auto-low", label: "低自主" },
+                            { value: "auto-high", label: "高自主" },
+                          ].map((mode) => (
+                            <button
+                              key={mode.value}
+                              onClick={() => updateSessionSetting(session.id, "autonomyMode", mode.value)}
+                              className={cn(
+                                "px-2.5 py-1 text-xs rounded-md transition-all",
+                                settings.autonomyMode === mode.value
+                                  ? "bg-blue-500 text-white"
+                                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200",
+                              )}
+                            >
+                              {mode.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 保存按钮 */}
+                      <div className="flex justify-end pt-2">
+                        <button
+                          onClick={() => saveSessionModel(session.id)}
+                          disabled={savingModel || !settings.selectedModel}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                            savingModel || !settings.selectedModel
+                              ? "bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed"
+                              : "bg-blue-500 hover:bg-blue-600 text-white",
+                          )}
+                        >
+                          <Check size={12} />
+                          {savingModel ? "保存中..." : "保存设置"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>
+      )}
 
-        {/* Footer */}
-        <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            共 {sessions.length} 个会话
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={loadSessions}
-              disabled={loading}
-              className={buttonStyles.secondary}
-            >
-              {loading ? "加载中..." : "刷新"}
-            </button>
-            <button
-              onClick={() => setIsOpen(false)}
-              className={buttonStyles.primary}
-            >
-              关闭
-            </button>
-          </div>
-        </div>
-
-        {/* 删除确认对话框 */}
-        {deleteConfirmId && (
-          <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60]">
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-6 max-w-md mx-4">
-              <div className="flex items-start gap-3 mb-4">
-                <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                  <AlertTriangle
-                    size={20}
-                    className="text-red-600 dark:text-red-400"
-                  />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
-                    确认删除
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    确定要删除这个会话吗？此操作不可恢复。
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-2 font-mono">
-                    {deleteConfirmId}
-                  </p>
-                </div>
+      {/* 删除确认对话框 */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60]">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-6 max-w-md mx-4">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <AlertTriangle
+                  size={20}
+                  className="text-red-600 dark:text-red-400"
+                />
               </div>
-
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  onClick={() => setDeleteConfirmId(null)}
-                  className={cn(buttonStyles.secondary, "px-4 py-2")}
-                >
-                  取消
-                </button>
-                <button
-                  onClick={() => deleteSession(deleteConfirmId)}
-                  className={cn(
-                    "px-4 py-2 rounded-lg transition-all duration-200",
-                    "bg-red-500 hover:bg-red-600 text-white",
-                    "font-medium shadow-sm",
-                  )}
-                >
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
                   确认删除
-                </button>
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  确定要删除这个会话吗？此操作不可恢复。
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-2 font-mono">
+                  {deleteConfirmId}
+                </p>
               </div>
             </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className={cn(buttonStyles.secondary, "px-4 py-2")}
+              >
+                取消
+                </button>
+              <button
+                onClick={() => deleteSession(deleteConfirmId)}
+                className={cn(
+                  "px-4 py-2 rounded-lg transition-all duration-200",
+                  "bg-red-500 hover:bg-red-600 text-white",
+                  "font-medium shadow-sm",
+                )}
+              >
+                确认删除
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

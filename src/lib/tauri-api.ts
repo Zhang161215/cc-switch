@@ -900,6 +900,80 @@ export const tauriAPI = {
     }
   },
 
+  // ============================================
+  // Droid 默认模型和会话模型管理 API
+  // ============================================
+
+  // 获取全局默认模型
+  getDroidDefaultModel: async (): Promise<string | null> => {
+    try {
+      return await invoke("get_droid_default_model");
+    } catch (error) {
+      console.error("获取默认模型失败:", error);
+      throw error;
+    }
+  },
+
+  // 设置全局默认模型
+  setDroidDefaultModel: async (
+    model: string,
+    reasoningEffort?: string,
+    autonomyMode?: string,
+  ): Promise<void> => {
+    try {
+      await invoke("set_droid_default_model", {
+        model,
+        reasoningEffort,
+        autonomyMode,
+      });
+    } catch (error) {
+      console.error("设置默认模型失败:", error);
+      throw error;
+    }
+  },
+
+  // 获取会话当前模型
+  getDroidSessionModel: async (sessionId: string): Promise<string | null> => {
+    try {
+      return await invoke("get_droid_session_model", { sessionId });
+    } catch (error) {
+      console.error("获取会话模型失败:", error);
+      throw error;
+    }
+  },
+
+  // 设置会话模型
+  setDroidSessionModel: async (
+    sessionId: string,
+    model: string,
+    providerLock?: string,
+    reasoningEffort?: string,
+    autonomyMode?: string,
+  ): Promise<void> => {
+    try {
+      await invoke("set_droid_session_model", {
+        sessionId,
+        model,
+        providerLock,
+        reasoningEffort,
+        autonomyMode,
+      });
+    } catch (error) {
+      console.error("设置会话模型失败:", error);
+      throw error;
+    }
+  },
+
+  // 获取会话完整设置
+  getDroidSessionSettings: async (sessionId: string): Promise<any> => {
+    try {
+      return await invoke("get_droid_session_settings", { sessionId });
+    } catch (error) {
+      console.error("获取会话设置失败:", error);
+      throw error;
+    }
+  },
+
   // 监听供应商切换事件
   onProviderSwitched: async (
     callback: (data: { appType: string; providerId: string }) => void,

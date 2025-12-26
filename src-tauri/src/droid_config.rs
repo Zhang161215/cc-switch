@@ -2,8 +2,7 @@ use dirs;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
-use std::path::PathBuf;
-use std::process::Command;
+use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -291,7 +290,7 @@ pub fn apply_provider_to_factory(provider: &DroidProvider) -> Result<(), String>
         model: provider.model.clone()
             .unwrap_or_else(|| "claude-sonnet-4-5-20250929".to_string()),
         base_url: provider.base_url.clone()
-            .unwrap_or_else(|| "https://droid2api-2st1n.sevalla.app".to_string()),
+            .unwrap_or_else(|| "https://api.factory.ai".to_string()),
         api_key: provider.api_key.clone(),
         provider: provider.provider.clone()
             .unwrap_or_else(|| "anthropic".to_string()),
@@ -334,6 +333,8 @@ pub struct DroidSession {
     pub token_usage: Option<TokenUsage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_dir: Option<String>,
 }
 
 /// Token 使用量
@@ -387,91 +388,114 @@ pub fn read_droid_sessions() -> Result<Vec<DroidSession>, String> {
 
     let mut sessions = Vec::new();
     
-    // 遍历 sessions 目录
-    let entries = fs::read_dir(&sessions_dir)
-        .map_err(|e| format!("读取会话目录失败: {}", e))?;
-
-    for entry in entries {
-        let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
-        let path = entry.path();
+    // 递归收集所有 .jsonl 文件
+    fn collect_jsonl_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
+        let entries = fs::read_dir(dir)
+            .map_err(|e| format!("读取目录失败: {}", e))?;
         
-        // 只处理 .jsonl 文件
-        if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
-            if let Some(session_id) = path.file_stem().and_then(|s| s.to_str()) {
-                // 读取 .jsonl 文件的第一行获取会话信息
-                if let Ok(content) = fs::read_to_string(&path) {
-                    if let Some(first_line) = content.lines().next() {
-                        if let Ok(session_start) = serde_json::from_str::<Value>(first_line) {
-                            if session_start["type"] == "session_start" {
-                                let title = session_start["title"]
-                                    .as_str()
-                                    .unwrap_or("无标题")
-                                    .to_string();
-                                
-                                let owner = session_start["owner"]
-                                    .as_str()
-                                    .map(|s| s.to_string());
-                                
-                                // 如果无法确定当前 owner，则显示所有会话（兼容模式）
-                                // 如果能确定当前 owner，则只显示匹配的会话
-                                if let Some(current) = &current_owner {
-                                    if let Some(session_owner) = &owner {
-                                        // 如果 owner 不匹配，跳过这个会话
-                                        if session_owner != current {
-                                            continue;
-                                        }
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
+            let path = entry.path();
+            
+            if path.is_dir() {
+                // 递归遍历子目录
+                collect_jsonl_files(&path, files)?;
+            } else if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                files.push(path);
+            }
+        }
+        Ok(())
+    }
+    
+    let mut jsonl_files = Vec::new();
+    collect_jsonl_files(&sessions_dir, &mut jsonl_files)?;
+
+    for path in jsonl_files {
+        if let Some(session_id) = path.file_stem().and_then(|s| s.to_str()) {
+            // 读取 .jsonl 文件的第一行获取会话信息
+            if let Ok(content) = fs::read_to_string(&path) {
+                if let Some(first_line) = content.lines().next() {
+                    if let Ok(session_start) = serde_json::from_str::<Value>(first_line) {
+                        if session_start["type"] == "session_start" {
+                            let title = session_start["title"]
+                                .as_str()
+                                .unwrap_or("无标题")
+                                .to_string();
+                            
+                            let owner = session_start["owner"]
+                                .as_str()
+                                .map(|s| s.to_string());
+                            
+                            // 如果无法确定当前 owner，则显示所有会话（兼容模式）
+                            // 如果能确定当前 owner，则只显示匹配的会话
+                            if let Some(current) = &current_owner {
+                                if let Some(session_owner) = &owner {
+                                    // 如果 owner 不匹配，跳过这个会话
+                                    if session_owner != current {
+                                        continue;
                                     }
-                                    // 如果会话没有 owner 信息（旧数据），也包含在结果中
                                 }
-                                // 如果 current_owner 是 None，则包含所有会话
+                                // 如果会话没有 owner 信息（旧数据），也包含在结果中
+                            }
+                            // 如果 current_owner 是 None，则包含所有会话
 
-                                // 读取对应的 .settings.json 文件获取 token 使用量
-                                let settings_path = path.with_extension("settings.json");
-                                let token_usage = if settings_path.exists() {
-                                    fs::read_to_string(&settings_path)
-                                        .ok()
-                                        .and_then(|content| serde_json::from_str::<Value>(&content).ok())
-                                        .and_then(|settings| {
-                                            let token_usage = settings.get("tokenUsage")?;
-                                            Some(TokenUsage {
-                                                input_tokens: token_usage["inputTokens"].as_i64(),
-                                                output_tokens: token_usage["outputTokens"].as_i64(),
-                                                cache_creation_tokens: token_usage["cacheCreationTokens"].as_i64(),
-                                                cache_read_tokens: token_usage["cacheReadTokens"].as_i64(),
-                                            })
+                            // 读取对应的 .settings.json 文件获取 token 使用量
+                            let settings_path = path.with_extension("settings.json");
+                            let token_usage = if settings_path.exists() {
+                                fs::read_to_string(&settings_path)
+                                    .ok()
+                                    .and_then(|content| serde_json::from_str::<Value>(&content).ok())
+                                    .and_then(|settings| {
+                                        let token_usage = settings.get("tokenUsage")?;
+                                        Some(TokenUsage {
+                                            input_tokens: token_usage["inputTokens"].as_i64(),
+                                            output_tokens: token_usage["outputTokens"].as_i64(),
+                                            cache_creation_tokens: token_usage["cacheCreationTokens"].as_i64(),
+                                            cache_read_tokens: token_usage["cacheReadTokens"].as_i64(),
                                         })
-                                } else {
-                                    None
-                                };
+                                    })
+                            } else {
+                                None
+                            };
 
-                                // 获取文件修改时间作为时间戳
-                                let timestamp = if let Ok(metadata) = fs::metadata(&path) {
-                                    if let Ok(modified) = metadata.modified() {
-                                        if let Ok(duration) = modified.duration_since(UNIX_EPOCH) {
-                                            // 转换为 ISO 8601 格式
-                                            let secs = duration.as_secs();
-                                            chrono::DateTime::from_timestamp(secs as i64, 0)
-                                                .map(|dt| dt.to_rfc3339())
-                                                .unwrap_or_else(|| duration.as_secs().to_string())
-                                        } else {
-                                            "Unknown".to_string()
-                                        }
+                            // 获取文件修改时间作为时间戳
+                            let timestamp = if let Ok(metadata) = fs::metadata(&path) {
+                                if let Ok(modified) = metadata.modified() {
+                                    if let Ok(duration) = modified.duration_since(UNIX_EPOCH) {
+                                        // 转换为 ISO 8601 格式
+                                        let secs = duration.as_secs();
+                                        chrono::DateTime::from_timestamp(secs as i64, 0)
+                                            .map(|dt| dt.to_rfc3339())
+                                            .unwrap_or_else(|| duration.as_secs().to_string())
                                     } else {
                                         "Unknown".to_string()
                                     }
                                 } else {
                                     "Unknown".to_string()
-                                };
+                                }
+                            } else {
+                                "Unknown".to_string()
+                            };
 
-                                sessions.push(DroidSession {
-                                    id: session_id.to_string(),
-                                    title,
-                                    timestamp,
-                                    owner,
-                                    token_usage,
-                                    file_path: Some(path.to_string_lossy().to_string()),
+                            // 从父目录名提取工作目录
+                            // 目录名格式: -Users-user-cc-switch -> /Users/user/cc-switch
+                            let working_dir = path.parent()
+                                .and_then(|p| p.file_name())
+                                .and_then(|name| name.to_str())
+                                .map(|name| {
+                                    // 将 -Users-user-xxx 转换为 /Users/user/xxx
+                                    name.replace('-', "/")
                                 });
-                            }
+
+                            sessions.push(DroidSession {
+                                id: session_id.to_string(),
+                                title,
+                                timestamp,
+                                owner,
+                                token_usage,
+                                file_path: Some(path.to_string_lossy().to_string()),
+                                working_dir,
+                            });
                         }
                     }
                 }
@@ -483,4 +507,224 @@ pub fn read_droid_sessions() -> Result<Vec<DroidSession>, String> {
     sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
     Ok(sessions)
+}
+
+// ============================================
+// Factory Settings 管理 (settings.json)
+// ============================================
+
+/// Session Default Settings 结构
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionDefaultSettings {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub autonomy_mode: Option<String>,
+}
+
+/// Factory Settings 结构 (~/.factory/settings.json)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct FactorySettings {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_default_settings: Option<SessionDefaultSettings>,
+    // 保留其他字段
+    #[serde(flatten)]
+    pub other: serde_json::Map<String, Value>,
+}
+
+/// 获取 Factory settings.json 文件路径
+pub fn get_factory_settings_path() -> Result<PathBuf, String> {
+    let config_dir = get_factory_config_dir()?;
+    Ok(config_dir.join("settings.json"))
+}
+
+/// 读取 Factory settings.json
+pub fn read_factory_settings() -> Result<FactorySettings, String> {
+    let settings_path = get_factory_settings_path()?;
+    
+    if !settings_path.exists() {
+        return Ok(FactorySettings::default());
+    }
+    
+    let content = fs::read_to_string(&settings_path)
+        .map_err(|e| format!("读取 Factory settings.json 失败: {}", e))?;
+    
+    let settings: FactorySettings = serde_json::from_str(&content)
+        .unwrap_or_else(|_| FactorySettings::default());
+    
+    Ok(settings)
+}
+
+/// 写入 Factory settings.json（保留其他字段）
+pub fn write_factory_settings(settings: &FactorySettings) -> Result<(), String> {
+    let settings_path = get_factory_settings_path()?;
+    let config_dir = get_factory_config_dir()?;
+    
+    // Ensure directory exists
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir)
+            .map_err(|e| format!("创建 .factory 目录失败: {}", e))?;
+    }
+    
+    let content = serde_json::to_string_pretty(settings)
+        .map_err(|e| format!("序列化 Factory settings 失败: {}", e))?;
+    
+    fs::write(&settings_path, content)
+        .map_err(|e| format!("写入 Factory settings.json 失败: {}", e))?;
+    
+    Ok(())
+}
+
+/// 获取全局默认模型设置
+pub fn get_default_model() -> Result<Option<String>, String> {
+    let settings = read_factory_settings()?;
+    Ok(settings.session_default_settings.and_then(|s| s.model))
+}
+
+/// 设置全局默认模型
+pub fn set_default_model(model: &str, reasoning_effort: Option<&str>, autonomy_mode: Option<&str>) -> Result<(), String> {
+    let settings_path = get_factory_settings_path()?;
+    
+    // 读取现有 settings.json 以保留其他字段
+    let mut json_value: Value = if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path)
+            .map_err(|e| format!("读取 Factory settings.json 失败: {}", e))?;
+        serde_json::from_str(&content).unwrap_or(Value::Object(serde_json::Map::new()))
+    } else {
+        Value::Object(serde_json::Map::new())
+    };
+    
+    // 确保 sessionDefaultSettings 存在
+    if !json_value.get("sessionDefaultSettings").is_some() {
+        json_value["sessionDefaultSettings"] = Value::Object(serde_json::Map::new());
+    }
+    
+    // 设置 model
+    json_value["sessionDefaultSettings"]["model"] = Value::String(model.to_string());
+    
+    // 可选设置 reasoningEffort
+    if let Some(effort) = reasoning_effort {
+        json_value["sessionDefaultSettings"]["reasoningEffort"] = Value::String(effort.to_string());
+    }
+    
+    // 可选设置 autonomyMode
+    if let Some(mode) = autonomy_mode {
+        json_value["sessionDefaultSettings"]["autonomyMode"] = Value::String(mode.to_string());
+    }
+    
+    // 写回文件
+    let config_dir = get_factory_config_dir()?;
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir)
+            .map_err(|e| format!("创建 .factory 目录失败: {}", e))?;
+    }
+    
+    let content = serde_json::to_string_pretty(&json_value)
+        .map_err(|e| format!("序列化 Factory settings 失败: {}", e))?;
+    
+    fs::write(&settings_path, content)
+        .map_err(|e| format!("写入 Factory settings.json 失败: {}", e))?;
+    
+    Ok(())
+}
+
+// ============================================
+// Session Settings 管理 ({session-id}.settings.json)
+// ============================================
+
+/// Session Settings 结构
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSettings {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub autonomy_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_lock: Option<String>,
+    // 保留其他字段
+    #[serde(flatten)]
+    pub other: serde_json::Map<String, Value>,
+}
+
+/// 获取会话 settings 文件路径
+fn get_session_settings_path(session_id: &str) -> Result<PathBuf, String> {
+    let config_dir = get_factory_config_dir()?;
+    Ok(config_dir.join("sessions").join(format!("{}.settings.json", session_id)))
+}
+
+/// 读取会话 settings
+pub fn read_session_settings(session_id: &str) -> Result<SessionSettings, String> {
+    let settings_path = get_session_settings_path(session_id)?;
+    
+    if !settings_path.exists() {
+        return Ok(SessionSettings::default());
+    }
+    
+    let content = fs::read_to_string(&settings_path)
+        .map_err(|e| format!("读取会话 settings 失败: {}", e))?;
+    
+    let settings: SessionSettings = serde_json::from_str(&content)
+        .unwrap_or_else(|_| SessionSettings::default());
+    
+    Ok(settings)
+}
+
+/// 设置会话模型
+pub fn set_session_model(
+    session_id: &str,
+    model: &str,
+    provider_lock: Option<&str>,
+    reasoning_effort: Option<&str>,
+    autonomy_mode: Option<&str>,
+) -> Result<(), String> {
+    let settings_path = get_session_settings_path(session_id)?;
+    
+    // 读取现有 settings 以保留其他字段
+    let mut json_value: Value = if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path)
+            .map_err(|e| format!("读取会话 settings 失败: {}", e))?;
+        serde_json::from_str(&content).unwrap_or(Value::Object(serde_json::Map::new()))
+    } else {
+        Value::Object(serde_json::Map::new())
+    };
+    
+    // 设置 model
+    json_value["model"] = Value::String(model.to_string());
+    
+    // 可选设置 providerLock
+    if let Some(lock) = provider_lock {
+        json_value["providerLock"] = Value::String(lock.to_string());
+    }
+    
+    // 可选设置 reasoningEffort
+    if let Some(effort) = reasoning_effort {
+        json_value["reasoningEffort"] = Value::String(effort.to_string());
+    }
+    
+    // 可选设置 autonomyMode
+    if let Some(mode) = autonomy_mode {
+        json_value["autonomyMode"] = Value::String(mode.to_string());
+    }
+    
+    // 写回文件
+    let content = serde_json::to_string_pretty(&json_value)
+        .map_err(|e| format!("序列化会话 settings 失败: {}", e))?;
+    
+    fs::write(&settings_path, content)
+        .map_err(|e| format!("写入会话 settings 失败: {}", e))?;
+    
+    Ok(())
+}
+
+/// 获取会话当前模型
+pub fn get_session_model(session_id: &str) -> Result<Option<String>, String> {
+    let settings = read_session_settings(session_id)?;
+    Ok(settings.model)
 }

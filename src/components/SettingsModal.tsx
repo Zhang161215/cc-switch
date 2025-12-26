@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { ImportProgressModal } from "./ImportProgressModal";
-import { Droid2ApiControl } from "./Droid2ApiControl";
 import { homeDir, join } from "@tauri-apps/api/path";
 import "../lib/tauri-api";
 import { relaunchApp } from "../lib/updater";
@@ -872,13 +871,6 @@ export default function SettingsModal({
             </div>
           </div>
 
-          {/* droid2api 服务控制 */}
-          <div>
-            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
-              API 代理服务
-            </h3>
-            <Droid2ApiControl />
-          </div>
         </div>
 
         {/* 底部按钮 */}

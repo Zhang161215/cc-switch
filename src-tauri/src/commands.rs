@@ -1395,26 +1395,10 @@ pub async fn update_droid_provider(
             // 更新provider
             *existing = provider.clone();
             
-            // 如果是当前provider，更新到 Factory 配置
+            // 如果是当前provider，只保存状态（不再自动更新 Factory 自定义模型）
             if droid_manager.current == provider.id {
-                println!("[DEBUG] This is the current provider, updating Factory config");
+                println!("[DEBUG] This is the current provider, saving state");
                 drop(config);
-                
-                // 先删除旧的配置（如果model_display_name改变了）
-                if old_model_display_name != provider.model_display_name {
-                    println!("[DEBUG] model_display_name changed, removing old config");
-                    if let Err(e) = crate::droid_config::remove_old_factory_model(&old_model_display_name) {
-                        println!("[ERROR] Failed to remove old factory model: {}", e);
-                        return Err(format!("删除旧配置失败: {}", e));
-                    }
-                }
-                
-                // 应用新配置
-                println!("[DEBUG] Applying provider to Factory config");
-                if let Err(e) = crate::droid_config::apply_provider_to_factory(&provider) {
-                    println!("[ERROR] Failed to apply provider to factory: {}", e);
-                    return Err(format!("应用配置到 Factory 失败: {}", e));
-                }
                 
                 println!("[DEBUG] Saving state");
                 if let Err(e) = state.save() {
@@ -1492,8 +1476,9 @@ pub async fn switch_droid_provider(
         }
     }; // config 在这里被自动释放
 
-    // 应用到 Factory 配置
-    crate::droid_config::apply_provider_to_factory(&provider)?;
+    // 不再自动应用到 Factory 配置（用户需要手动在 Factory 配置中添加自定义模型）
+    // crate::droid_config::apply_provider_to_factory(&provider)?;
+    let _ = provider; // 避免 unused 警告
 
     // 🐾 立即更新当前进程的环境变量（这样UI和子进程都能立即使用）
     std::env::set_var("FACTORY_API_KEY", &api_key);
@@ -2167,11 +2152,11 @@ pub async fn get_droid_sessions() -> Result<Vec<crate::droid_config::DroidSessio
     crate::droid_config::read_droid_sessions()
 }
 
-/// 获取会话 ID（用于复制）
+/// 获取恢复会话的命令
 #[tauri::command]
-pub async fn get_droid_session_command(session_id: String, working_dir: Option<String>) -> Result<String, String> {
-    // 只返回 session ID，方便用户复制
-    Ok(session_id)
+pub async fn get_droid_session_command(session_id: String, _working_dir: Option<String>) -> Result<String, String> {
+    // 返回 droid --resume 命令
+    Ok(format!("droid --resume {}", session_id))
 }
 
 /// 复制文本到剪贴板（后端实现，避免前端权限问题）
@@ -2215,7 +2200,7 @@ pub async fn delete_droid_session(session_id: String) -> Result<(), String> {
     Ok(())
 }
 
-/// 在终端中打开 Droid 交互模式并执行 /sessions（macOS）
+/// 在终端中打开 Droid 会话（macOS）
 #[tauri::command]
 pub async fn open_droid_in_terminal(session_id: String, working_dir: Option<String>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -2228,11 +2213,11 @@ pub async fn open_droid_in_terminal(session_id: String, working_dir: Option<Stri
         
         println!("[open_droid_in_terminal] 选择的终端: {}", preferred_terminal);
         
-        // 执行 droid /sessions 命令
+        // 执行 droid --resume 命令恢复会话
         let cmd = if let Some(dir) = working_dir {
-            format!("cd '{}' && droid /sessions", dir)
+            format!("cd '{}' && droid --resume {}", dir, session_id)
         } else {
-            format!("droid /sessions")
+            format!("droid --resume {}", session_id)
         };
         
         println!("[open_droid_in_terminal] 要执行的命令: {}", cmd);
@@ -2388,4 +2373,60 @@ pub async fn create_manual_backup(
     let backup_manager = ConfigBackupManager::new(config_path);
 
     backup_manager.create_backup()
+}
+
+// ============================================
+// Droid 默认模型和会话模型管理
+// ============================================
+
+/// 获取全局默认模型
+#[tauri::command]
+pub async fn get_droid_default_model() -> Result<Option<String>, String> {
+    crate::droid_config::get_default_model()
+}
+
+/// 设置全局默认模型
+#[tauri::command]
+pub async fn set_droid_default_model(
+    model: String,
+    reasoning_effort: Option<String>,
+    autonomy_mode: Option<String>,
+) -> Result<(), String> {
+    crate::droid_config::set_default_model(
+        &model,
+        reasoning_effort.as_deref(),
+        autonomy_mode.as_deref(),
+    )
+}
+
+/// 获取会话当前模型
+#[tauri::command]
+pub async fn get_droid_session_model(session_id: String) -> Result<Option<String>, String> {
+    crate::droid_config::get_session_model(&session_id)
+}
+
+/// 设置会话模型
+#[tauri::command]
+pub async fn set_droid_session_model(
+    session_id: String,
+    model: String,
+    provider_lock: Option<String>,
+    reasoning_effort: Option<String>,
+    autonomy_mode: Option<String>,
+) -> Result<(), String> {
+    crate::droid_config::set_session_model(
+        &session_id,
+        &model,
+        provider_lock.as_deref(),
+        reasoning_effort.as_deref(),
+        autonomy_mode.as_deref(),
+    )
+}
+
+/// 读取会话完整设置
+#[tauri::command]
+pub async fn get_droid_session_settings(
+    session_id: String,
+) -> Result<crate::droid_config::SessionSettings, String> {
+    crate::droid_config::read_session_settings(&session_id)
 }

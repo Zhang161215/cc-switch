@@ -4,6 +4,7 @@ import {
   useImperativeHandle,
   forwardRef,
   useRef,
+  ReactNode,
 } from "react";
 import { DroidProvider } from "../types";
 import {
@@ -18,6 +19,8 @@ import {
   ArrowUpDown,
   Calendar,
   Coins,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { buttonStyles, cardStyles, badgeStyles, cn } from "../lib/styles";
 
@@ -33,6 +36,7 @@ interface DroidProviderListProps {
   onDelete: (id: string) => void;
   onUpdate?: (provider: DroidProvider, silent?: boolean) => void;
   onNotify?: (message: string, type: "success" | "error") => void;
+  children?: ReactNode;
 }
 
 interface BalanceInfo {
@@ -59,6 +63,7 @@ const DroidProviderList = forwardRef<
       onDelete,
       onUpdate,
       onNotify,
+      children,
     },
     ref,
   ) => {
@@ -67,6 +72,7 @@ const DroidProviderList = forwardRef<
     const [sortBy, setSortBy] = useState<"default" | "expiry" | "remaining">(
       "default",
     );
+    const [isApiKeysSectionOpen, setIsApiKeysSectionOpen] = useState(true);
 
     // 获取余额信息
     const fetchBalance = async (provider: DroidProvider) => {
@@ -373,9 +379,37 @@ const DroidProviderList = forwardRef<
 
     return (
       <div className="space-y-4">
-        {/* 汇总统计卡片 */}
-        {summary.validCount > 0 && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+        {/* API Keys 可折叠区域标题 */}
+        <button
+          onClick={() => setIsApiKeysSectionOpen(!isApiKeysSectionOpen)}
+          className={cn(
+            "w-full flex items-center justify-between p-3 rounded-lg border transition-all",
+            "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+            "hover:border-blue-300 dark:hover:border-blue-600",
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <Key size={16} className="text-blue-500" />
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              API Key 管理
+            </span>
+            <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
+              {providers.length} 个
+            </span>
+          </div>
+          {isApiKeysSectionOpen ? (
+            <ChevronUp size={16} className="text-gray-400" />
+          ) : (
+            <ChevronDown size={16} className="text-gray-400" />
+          )}
+        </button>
+
+        {/* 可折叠内容区域 */}
+        {isApiKeysSectionOpen && (
+          <>
+            {/* 汇总统计卡片 */}
+            {summary.validCount > 0 && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
                 <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300">
@@ -774,6 +808,10 @@ const DroidProviderList = forwardRef<
             </div>
           );
         })}
+            {/* 子组件：当前 API Key 状态 */}
+            {children}
+          </>
+        )}
       </div>
     );
   },
