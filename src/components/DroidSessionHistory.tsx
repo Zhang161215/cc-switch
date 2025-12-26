@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { DroidSession, DroidCustomModel } from "../types";
+import { DroidSession, FactoryCustomModelWithId } from "../types";
 import {
   History,
   Terminal,
@@ -27,17 +27,12 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
   const [sessions, setSessions] = useState<DroidSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true); // 默认展开
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [expandedSettingsId, setExpandedSettingsId] = useState<string | null>(null);
-  const [customModels, setCustomModels] = useState<DroidCustomModel[]>([]);
-  const [sessionSettings, setSessionSettings] = useState<Record<string, {
-    selectedModel: string;
-    reasoningEffort: string;
-    autonomyMode: string;
-    providerLock: string;
-  }>>({});
+  const [customModels, setCustomModels] = useState<FactoryCustomModelWithId[]>([]);
   const [savingModel, setSavingModel] = useState(false);
+  const [sessionModels, setSessionModels] = useState<Record<string, string>>({}); // 存储每个会话的当前模型
 
   // 加载会话历史
   const loadSessions = async () => {
@@ -45,6 +40,19 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
     try {
       const result = await window.api.getDroidSessions();
       setSessions(result);
+      // 加载每个会话的模型设置
+      const modelMap: Record<string, string> = {};
+      for (const session of result.slice(0, 20)) { // 只加载前20个，避免太慢
+        try {
+          const settings = await window.api.getDroidSessionSettings(session.id);
+          if (settings.model) {
+            modelMap[session.id] = settings.model;
+          }
+        } catch {
+          // 忽略单个会话的加载失败
+        }
+      }
+      setSessionModels(modelMap);
     } catch (error) {
       onNotify?.(`加载会话历史失败: ${error}`, "error");
     } finally {
@@ -60,84 +68,50 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
     }
   }, [isOpen]);
 
-  // 加载自定义模型
+  // 加载自定义模型（使用带 id 的版本）
   const loadCustomModels = async () => {
     try {
-      const models = await window.api.getFactoryCustomModels();
+      const models = await window.api.getFactoryCustomModelsWithId();
       setCustomModels(models);
     } catch (error) {
       console.error("加载自定义模型失败:", error);
     }
   };
 
-  // 构建模型ID
-  const buildModelId = (model: DroidCustomModel, index: number): string => {
-    return `custom:${model.model_display_name}-${index}`;
-  };
-
   // 切换展开会话设置
   const toggleSessionSettings = async (sessionId: string) => {
     if (expandedSettingsId === sessionId) {
       setExpandedSettingsId(null);
-      return;
-    }
-    
-    // 加载会话设置
-    try {
-      const settings = await window.api.getDroidSessionSettings(sessionId);
-      setSessionSettings(prev => ({
-        ...prev,
-        [sessionId]: {
-          selectedModel: settings.model || "",
-          reasoningEffort: settings.reasoningEffort || "high",
-          autonomyMode: settings.autonomyMode || "auto-high",
-          providerLock: settings.providerLock || "anthropic",
+    } else {
+      // 加载会话当前模型设置
+      try {
+        const settings = await window.api.getDroidSessionSettings(sessionId);
+        if (settings.model) {
+          setSessionModels(prev => ({ ...prev, [sessionId]: settings.model }));
         }
-      }));
-    } catch (error) {
-      console.error("加载会话设置失败:", error);
-      setSessionSettings(prev => ({
-        ...prev,
-        [sessionId]: {
-          selectedModel: "",
-          reasoningEffort: "high",
-          autonomyMode: "auto-high",
-          providerLock: "anthropic",
-        }
-      }));
-    }
-    setExpandedSettingsId(sessionId);
-  };
-
-  // 更新会话设置
-  const updateSessionSetting = (sessionId: string, key: string, value: string) => {
-    setSessionSettings(prev => ({
-      ...prev,
-      [sessionId]: {
-        ...prev[sessionId],
-        [key]: value,
+      } catch (error) {
+        console.error("加载会话设置失败:", error);
       }
-    }));
+      setExpandedSettingsId(sessionId);
+    }
   };
 
-  // 保存会话模型设置
-  const saveSessionModel = async (sessionId: string) => {
-    const settings = sessionSettings[sessionId];
-    if (!settings || !settings.selectedModel) {
-      onNotify?.("请选择一个模型", "error");
-      return;
-    }
-
+  // 直接设置会话模型（点击即保存）
+  const setSessionModelDirectly = async (sessionId: string, model: FactoryCustomModelWithId) => {
     setSavingModel(true);
     try {
+      // 根据 provider 自动设置 providerLock
+      const providerLock = model.provider === "anthropic" ? "anthropic" : "openai";
       await window.api.setDroidSessionModel(
         sessionId,
-        settings.selectedModel,
-        settings.providerLock,
-        settings.reasoningEffort,
-        settings.autonomyMode,
+        model.id,  // 直接使用 settings.json 中的完整 id
+        providerLock,
+        "high", // 默认高推理
+        "auto-high", // 默认高自主
       );
-      onNotify?.("会话模型设置成功", "success");
+      // 更新本地状态
+      setSessionModels(prev => ({ ...prev, [sessionId]: model.id }));
+      onNotify?.(`已设置为 ${model.displayName}`, "success");
       setExpandedSettingsId(null);
     } catch (error) {
       onNotify?.(`设置失败: ${error}`, "error");
@@ -302,10 +276,9 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
               <p>暂无会话历史</p>
             </div>
           ) : (
-            <div className="space-y-2 max-h-80 overflow-y-auto">
+            <div className="space-y-2 max-h-[500px] overflow-y-auto">
               {sessions.map((session) => {
                 const isExpanded = expandedSettingsId === session.id;
-                const settings = sessionSettings[session.id];
                 return (
                 <div
                   key={session.id}
@@ -417,9 +390,9 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
                       <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                         模型设置
                       </span>
-                      {settings?.selectedModel && (
-                        <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
-                          已配置
+                      {sessionModels[session.id] && (
+                        <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded truncate max-w-[120px]">
+                          {sessionModels[session.id].replace(/^custom:/, '')}
                         </span>
                       )}
                     </div>
@@ -432,142 +405,45 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
                     />
                   </button>
 
-                  {/* 展开的设置内容 */}
-                  {isExpanded && settings && (
-                    <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 space-y-3">
-                      {/* 模型选择 */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-                          选择自定义模型
-                        </label>
-                        <div className="grid grid-cols-1 gap-1.5 max-h-40 overflow-y-auto">
-                          {customModels.map((model, index) => {
-                            const modelId = buildModelId(model, index);
-                            const isSelected = settings.selectedModel === modelId;
-                            return (
-                              <button
-                                key={index}
-                                onClick={() => updateSessionSetting(session.id, "selectedModel", modelId)}
-                                className={cn(
-                                  "w-full flex items-center justify-between p-2 rounded-md border transition-all text-left",
-                                  isSelected
-                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                    : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-blue-300",
-                                )}
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className={cn(
-                                      "text-xs font-medium truncate",
-                                      isSelected ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"
-                                    )}>
-                                      {model.model_display_name}
-                                    </span>
-                                    {isSelected && <Check size={12} className="text-blue-500 flex-shrink-0" />}
-                                  </div>
-                                </div>
-                                <span className="text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded ml-2">
-                                  {model.provider}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Provider Lock */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
-                          Provider Lock
-                        </label>
-                        <div className="flex gap-1.5">
-                          {["anthropic", "openai"].map((provider) => (
+                  {/* 展开的设置内容 - 点击模型即保存 */}
+                  {isExpanded && (
+                    <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                        选择模型（点击即设置）
+                      </label>
+                      <div className="grid grid-cols-1 gap-1.5 max-h-40 overflow-y-auto">
+                        {customModels.map((model, index) => {
+                          const isCurrentModel = sessionModels[session.id] === model.id;
+                          return (
                             <button
-                              key={provider}
-                              onClick={() => updateSessionSetting(session.id, "providerLock", provider)}
+                              key={index}
+                              onClick={() => setSessionModelDirectly(session.id, model)}
+                              disabled={savingModel}
                               className={cn(
-                                "px-2.5 py-1 text-xs rounded-md transition-all",
-                                settings.providerLock === provider
-                                  ? "bg-blue-500 text-white"
-                                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200",
+                                "w-full flex items-center justify-between p-2 rounded-md border transition-all text-left",
+                                isCurrentModel
+                                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
+                                  : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20",
+                                savingModel && "opacity-50 cursor-not-allowed",
                               )}
                             >
-                              {provider}
+                              <span className={cn(
+                                "text-xs font-medium truncate",
+                                isCurrentModel ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"
+                              )}>
+                                {model.displayName}
+                                {isCurrentModel && " ✓"}
+                              </span>
+                              <span className="text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded ml-2">
+                                {model.provider}
+                              </span>
                             </button>
-                          ))}
-                        </div>
+                          );
+                        })}
                       </div>
-
-                      {/* 推理级别 */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
-                          推理级别
-                        </label>
-                        <div className="flex gap-1.5">
-                          {[
-                            { value: "off", label: "关闭" },
-                            { value: "low", label: "低" },
-                            { value: "medium", label: "中" },
-                            { value: "high", label: "高" },
-                          ].map((effort) => (
-                            <button
-                              key={effort.value}
-                              onClick={() => updateSessionSetting(session.id, "reasoningEffort", effort.value)}
-                              className={cn(
-                                "px-2.5 py-1 text-xs rounded-md transition-all",
-                                settings.reasoningEffort === effort.value
-                                  ? "bg-blue-500 text-white"
-                                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200",
-                              )}
-                            >
-                              {effort.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* 自主模式 */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
-                          自主模式
-                        </label>
-                        <div className="flex gap-1.5">
-                          {[
-                            { value: "auto-low", label: "低自主" },
-                            { value: "auto-high", label: "高自主" },
-                          ].map((mode) => (
-                            <button
-                              key={mode.value}
-                              onClick={() => updateSessionSetting(session.id, "autonomyMode", mode.value)}
-                              className={cn(
-                                "px-2.5 py-1 text-xs rounded-md transition-all",
-                                settings.autonomyMode === mode.value
-                                  ? "bg-blue-500 text-white"
-                                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200",
-                              )}
-                            >
-                              {mode.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* 保存按钮 */}
-                      <div className="flex justify-end pt-2">
-                        <button
-                          onClick={() => saveSessionModel(session.id)}
-                          disabled={savingModel || !settings.selectedModel}
-                          className={cn(
-                            "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                            savingModel || !settings.selectedModel
-                              ? "bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed"
-                              : "bg-blue-500 hover:bg-blue-600 text-white",
-                          )}
-                        >
-                          <Check size={12} />
-                          {savingModel ? "保存中..." : "保存设置"}
-                        </button>
-                      </div>
+                      {savingModel && (
+                        <div className="text-xs text-center text-gray-500 mt-2">设置中...</div>
+                      )}
                     </div>
                   )}
                 </div>

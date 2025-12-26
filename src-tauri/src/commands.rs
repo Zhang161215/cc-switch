@@ -1660,6 +1660,13 @@ pub async fn get_factory_custom_models() -> Result<Vec<crate::droid_config::Droi
     Ok(config.custom_models)
 }
 
+/// 获取 Factory settings.json 中的自定义模型（带完整 id）
+#[tauri::command]
+pub async fn get_factory_custom_models_with_id() -> Result<Vec<crate::droid_config::FactoryCustomModelWithId>, String> {
+    let settings = crate::droid_config::read_factory_settings()?;
+    Ok(settings.custom_models)
+}
+
 /// 删除 Factory 配置中的自定义模型
 #[tauri::command]
 pub async fn delete_factory_custom_model(model_display_name: String) -> Result<(), String> {

@@ -14,7 +14,6 @@ import {
   FactoryEnvDisplayRef,
 } from "./components/FactoryEnvDisplay";
 import DroidSessionHistory from "./components/DroidSessionHistory";
-import DroidDefaultModelSelector from "./components/DroidDefaultModelSelector";
 import FactoryConfigEditor from "./components/FactoryConfigEditor";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppSwitcher } from "./components/AppSwitcher";
@@ -550,9 +549,6 @@ function App() {
 
             {activeApp === "droid" ? (
               <>
-                {/* 默认模型选择器 */}
-                <DroidDefaultModelSelector onNotify={showNotification} />
-
                 {/* 会话历史 */}
                 <DroidSessionHistory onNotify={showNotification} />
 

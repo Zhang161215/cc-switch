@@ -798,6 +798,16 @@ export const tauriAPI = {
     }
   },
 
+  // 获取 Factory settings.json 中的自定义模型（带完整 id）
+  getFactoryCustomModelsWithId: async (): Promise<any[]> => {
+    try {
+      return await invoke("get_factory_custom_models_with_id");
+    } catch (error) {
+      console.error("获取 Factory 自定义模型（带 id）失败:", error);
+      throw error;
+    }
+  },
+
   // 删除 Factory 配置中的自定义模型
   deleteFactoryCustomModel: async (modelDisplayName: string): Promise<void> => {
     try {

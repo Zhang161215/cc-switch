@@ -111,6 +111,15 @@ export interface DroidCustomModel {
   supports_prompt_caching?: boolean;
 }
 
+// Factory settings.json 中的自定义模型（带完整 id）
+export interface FactoryCustomModelWithId {
+  id: string;
+  displayName: string;
+  model: string;
+  baseUrl: string;
+  provider: string;
+}
+
 // Droid 配置（对应 .factory/config.json）
 export interface DroidConfig {
   custom_models: DroidCustomModel[];

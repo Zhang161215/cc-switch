@@ -525,12 +525,26 @@ pub struct SessionDefaultSettings {
     pub autonomy_mode: Option<String>,
 }
 
+/// settings.json 中的 customModels 项（带 id 字段）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FactoryCustomModelWithId {
+    pub id: String,
+    pub display_name: String,
+    pub model: String,
+    pub base_url: String,
+    #[serde(default)]
+    pub provider: String,
+}
+
 /// Factory Settings 结构 (~/.factory/settings.json)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct FactorySettings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_default_settings: Option<SessionDefaultSettings>,
+    #[serde(default)]
+    pub custom_models: Vec<FactoryCustomModelWithId>,
     // 保留其他字段
     #[serde(flatten)]
     pub other: serde_json::Map<String, Value>,
@@ -653,10 +667,42 @@ pub struct SessionSettings {
     pub other: serde_json::Map<String, Value>,
 }
 
-/// 获取会话 settings 文件路径
+/// 获取会话 settings 文件路径（需要找到 .jsonl 文件所在的子目录）
 fn get_session_settings_path(session_id: &str) -> Result<PathBuf, String> {
-    let config_dir = get_factory_config_dir()?;
-    Ok(config_dir.join("sessions").join(format!("{}.settings.json", session_id)))
+    let sessions_dir = get_factory_sessions_dir()?;
+    
+    // 递归搜索 .jsonl 文件
+    fn find_jsonl_file(dir: &Path, session_id: &str) -> Option<PathBuf> {
+        let entries = match fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => return None,
+        };
+        
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(found) = find_jsonl_file(&path, session_id) {
+                    return Some(found);
+                }
+            } else {
+                let stem = path.file_stem().and_then(|s| s.to_str());
+                let ext = path.extension().and_then(|s| s.to_str());
+                if stem == Some(session_id) && ext == Some("jsonl") {
+                    return Some(path);
+                }
+            }
+        }
+        None
+    }
+    
+    // 找到 .jsonl 文件，返回同目录下的 .settings.json 路径
+    if let Some(jsonl_path) = find_jsonl_file(&sessions_dir, session_id) {
+        let parent = jsonl_path.parent().ok_or("无法获取父目录")?;
+        Ok(parent.join(format!("{}.settings.json", session_id)))
+    } else {
+        // 如果找不到 .jsonl 文件，返回根目录下的路径（兼容）
+        Ok(sessions_dir.join(format!("{}.settings.json", session_id)))
+    }
 }
 
 /// 读取会话 settings
