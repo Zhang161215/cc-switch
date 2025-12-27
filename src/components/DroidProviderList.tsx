@@ -6,7 +6,7 @@ import {
   useRef,
   ReactNode,
 } from "react";
-import { DroidProvider, DroidCustomModel } from "../types";
+import { DroidProvider } from "../types";
 import {
   Play,
   Edit3,
@@ -21,7 +21,6 @@ import {
   Coins,
   ChevronDown,
   ChevronUp,
-  Settings,
 } from "lucide-react";
 import { buttonStyles, cardStyles, badgeStyles, cn } from "../lib/styles";
 
@@ -74,47 +73,6 @@ const DroidProviderList = forwardRef<
       "default",
     );
     const [isApiKeysSectionOpen, setIsApiKeysSectionOpen] = useState(false); // API Key 管理默认关闭
-    const [customModels, setCustomModels] = useState<DroidCustomModel[]>([]);
-    const [defaultModel, setDefaultModel] = useState<string | null>(null);
-    const [savingDefaultModel, setSavingDefaultModel] = useState(false);
-
-    // 加载自定义模型列表
-    const loadCustomModels = async () => {
-      try {
-        const [models, currentDefault] = await Promise.all([
-          window.api.getFactoryCustomModels(),
-          window.api.getDroidDefaultModel(),
-        ]);
-        setCustomModels(models);
-        setDefaultModel(currentDefault);
-      } catch (error) {
-        console.error("加载自定义模型失败:", error);
-      }
-    };
-
-    // 构建模型ID
-    const buildModelId = (model: DroidCustomModel, index: number): string => {
-      return `custom:${model.model_display_name}-${index}`;
-    };
-
-    // 设置默认模型
-    const handleSetDefaultModel = async (modelId: string) => {
-      setSavingDefaultModel(true);
-      try {
-        await window.api.setDroidDefaultModel(modelId, "high", "auto-high");
-        setDefaultModel(modelId);
-        onNotify?.("默认模型设置成功", "success");
-      } catch (error) {
-        onNotify?.(`设置失败: ${error}`, "error");
-      } finally {
-        setSavingDefaultModel(false);
-      }
-    };
-
-    // 初始加载自定义模型
-    useEffect(() => {
-      loadCustomModels();
-    }, []);
 
     // 获取余额信息
     const fetchBalance = async (provider: DroidProvider) => {
@@ -421,41 +379,6 @@ const DroidProviderList = forwardRef<
 
     return (
       <div className="space-y-4">
-        {/* Factory 自定义模型配置 - 带默认模型选择 */}
-        {customModels.length > 0 && (
-          <div className="flex items-center gap-3 p-3 rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-            <Settings size={16} className="text-purple-500 flex-shrink-0" />
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-              默认模型
-            </span>
-            <select
-              value={defaultModel || ""}
-              onChange={(e) => handleSetDefaultModel(e.target.value)}
-              disabled={savingDefaultModel}
-              className={cn(
-                "min-w-[200px] max-w-[300px] text-sm px-3 py-2.5 rounded-md border bg-white dark:bg-gray-700",
-                "border-gray-300 dark:border-gray-600",
-                "text-gray-900 dark:text-gray-100",
-                "focus:ring-2 focus:ring-purple-500 focus:border-transparent",
-                savingDefaultModel && "opacity-50 cursor-not-allowed",
-              )}
-            >
-              <option value="">选择默认模型...</option>
-              {customModels.map((model, index) => {
-                const modelId = buildModelId(model, index);
-                return (
-                  <option key={index} value={modelId}>
-                    {model.model_display_name}
-                  </option>
-                );
-              })}
-            </select>
-            {savingDefaultModel && (
-              <span className="text-xs text-gray-500">保存中...</span>
-            )}
-          </div>
-        )}
-
         {/* API Keys 可折叠区域标题 */}
         <button
           onClick={() => setIsApiKeysSectionOpen(!isApiKeysSectionOpen)}

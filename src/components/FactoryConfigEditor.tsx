@@ -10,6 +10,7 @@ import {
   X,
   Eye,
   EyeOff,
+  Star,
 } from "lucide-react";
 import { DroidConfig, DroidCustomModel } from "../types";
 import { isLinux } from "../lib/platform";
@@ -34,6 +35,8 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
   const [editingIndex, setEditingIndex] = useState<number>(-1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [defaultModel, setDefaultModel] = useState<string | null>(null);
+  const [savingDefault, setSavingDefault] = useState(false);
 
   // 加载配置
   const loadConfig = async () => {
@@ -41,12 +44,45 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
     try {
       const factoryConfig = await window.api.getFactoryConfig();
       setConfig(factoryConfig);
+      // 加载默认模型
+      const defaultModelId = await window.api.getDroidDefaultModel();
+      setDefaultModel(defaultModelId);
     } catch (error) {
       console.error("加载 Factory 配置失败:", error);
       onNotify?.("加载配置失败", "error");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // 构建模型 ID
+  const buildModelId = (model: DroidCustomModel, index: number): string => {
+    return `custom:${model.model_display_name}-${index}`;
+  };
+
+  // 设置默认模型
+  const handleSetDefaultModel = async (model: DroidCustomModel, index: number) => {
+    const modelId = buildModelId(model, index);
+    setSavingDefault(true);
+    try {
+      await window.api.setDroidDefaultModel(modelId);
+      setDefaultModel(modelId);
+      onNotify?.(`已设置 ${model.model_display_name} 为默认模型`, "success");
+    } catch (error) {
+      onNotify?.(`设置失败: ${error}`, "error");
+    } finally {
+      setSavingDefault(false);
+    }
+  };
+
+  // 获取默认模型显示名称
+  const getDefaultModelName = (): string | null => {
+    if (!defaultModel || !config) return null;
+    const match = defaultModel.match(/^custom:(.+)-(\d+)$/);
+    if (match) {
+      return match[1];
+    }
+    return null;
   };
 
   useEffect(() => {
@@ -143,26 +179,36 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
 
   if (!config) return null;
 
+  const defaultModelName = getDefaultModelName();
+
   return (
     <>
-      <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+      <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         {/* 标题栏 */}
-        <div
-          className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        <button
+          className="w-full flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          <div className="flex items-center gap-2">
-            <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-            <h3 className="text-base font-medium text-gray-900 dark:text-gray-100">
-              Factory 自定义模型配置 ({config.custom_models.length})
-            </h3>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Settings className="h-4 w-4 text-purple-500 flex-shrink-0" />
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100 flex-shrink-0">
+              Factory 自定义模型配置
+            </span>
+            <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded flex-shrink-0">
+              {config.custom_models.length} 个
+            </span>
+            {defaultModelName && (
+              <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded truncate">
+                默认: {defaultModelName}
+              </span>
+            )}
           </div>
           {isExpanded ? (
-            <ChevronUp className="h-5 w-5 text-gray-500" />
+            <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0 ml-2" />
           ) : (
-            <ChevronDown className="h-5 w-5 text-gray-500" />
+            <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0 ml-2" />
           )}
-        </div>
+        </button>
 
         {/* 配置内容 */}
         {isExpanded && (
@@ -185,14 +231,29 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
               </div>
             ) : (
               <div className="space-y-2">
-                {config.custom_models.map((model, index) => (
+                {config.custom_models.map((model, index) => {
+                  const modelId = buildModelId(model, index);
+                  const isDefault = defaultModel === modelId;
+                  return (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+                    className={`flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors ${
+                      isDefault 
+                        ? "border-yellow-300 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900/10" 
+                        : "border-gray-200 dark:border-gray-700"
+                    }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-900 dark:text-gray-100">
-                        {model.model_display_name}
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">
+                          {model.model_display_name}
+                        </span>
+                        {isDefault && (
+                          <span className="text-xs px-1.5 py-0.5 bg-yellow-200 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-200 rounded flex items-center gap-1">
+                            <Star className="h-3 w-3" />
+                            默认
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
                         {model.provider} · {model.model}
@@ -201,7 +262,17 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
                         {model.base_url}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 ml-4">
+                    <div className="flex items-center gap-1 ml-4">
+                      {!isDefault && (
+                        <button
+                          onClick={() => handleSetDefaultModel(model, index)}
+                          disabled={savingDefault}
+                          className="p-2 text-gray-400 hover:text-yellow-500 hover:bg-yellow-100 dark:hover:bg-yellow-900/20 rounded-md transition-colors"
+                          title="设为默认"
+                        >
+                          <Star className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleEditModel(model, index)}
                         className="p-2 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
@@ -218,7 +289,8 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

@@ -385,13 +385,13 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
                         : "border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-600",
                     )}
                   >
-                    <div className="flex items-center gap-2">
-                      <Settings size={14} className="text-blue-500" />
-                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Settings size={14} className="text-blue-500 flex-shrink-0" />
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300 flex-shrink-0">
                         模型设置
                       </span>
                       {sessionModels[session.id] && (
-                        <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded truncate max-w-[120px]">
+                        <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded truncate">
                           {sessionModels[session.id].replace(/^custom:/, '')}
                         </span>
                       )}
@@ -399,7 +399,7 @@ const DroidSessionHistory: React.FC<DroidSessionHistoryProps> = ({
                     <ChevronDown
                       size={14}
                       className={cn(
-                        "text-gray-400 transition-transform",
+                        "text-gray-400 transition-transform flex-shrink-0 ml-2",
                         isExpanded && "rotate-180",
                       )}
                     />
