@@ -414,6 +414,12 @@ pub fn read_droid_sessions() -> Result<Vec<DroidSession>, String> {
         if let Some(session_id) = path.file_stem().and_then(|s| s.to_str()) {
             // 读取 .jsonl 文件的第一行获取会话信息
             if let Ok(content) = fs::read_to_string(&path) {
+                // 过滤空会话：至少需要有2行内容（session_start + 至少一条消息）
+                let line_count = content.lines().count();
+                if line_count < 2 {
+                    continue; // 跳过没有实际内容的会话
+                }
+                
                 if let Some(first_line) = content.lines().next() {
                     if let Ok(session_start) = serde_json::from_str::<Value>(first_line) {
                         if session_start["type"] == "session_start" {

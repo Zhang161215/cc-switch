@@ -2178,9 +2178,12 @@ pub async fn copy_to_clipboard(app: tauri::AppHandle, text: String) -> Result<()
 
 /// 删除 Droid 会话及其相关文件
 #[tauri::command]
-pub async fn delete_droid_session(session_id: String) -> Result<(), String> {
+#[allow(non_snake_case)]
+pub async fn delete_droid_session(sessionId: String) -> Result<(), String> {
     use std::fs;
     use std::path::PathBuf;
+    
+    let session_id = sessionId;
     
     // 获取会话文件路径
     let home_dir = dirs::home_dir()
@@ -2188,20 +2191,47 @@ pub async fn delete_droid_session(session_id: String) -> Result<(), String> {
     
     let sessions_dir = home_dir.join(".factory").join("sessions");
     
-    // 删除 .jsonl 文件
-    let jsonl_file = sessions_dir.join(format!("{}.jsonl", session_id));
-    if jsonl_file.exists() {
-        fs::remove_file(&jsonl_file)
-            .map_err(|e| format!("删除会话日志文件失败: {}", e))?;
-        println!("[delete_droid_session] 已删除: {:?}", jsonl_file);
+    // 递归查找并删除会话文件
+    fn find_and_delete_session(dir: &std::path::Path, session_id: &str) -> Result<bool, String> {
+        let entries = fs::read_dir(dir)
+            .map_err(|e| format!("读取目录失败: {}", e))?;
+        
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
+            let path = entry.path();
+            
+            if path.is_dir() {
+                // 递归遍历子目录
+                if find_and_delete_session(&path, session_id)? {
+                    return Ok(true);
+                }
+            } else if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                if let Some(file_stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    if file_stem == session_id {
+                        // 找到了，删除 .jsonl 文件
+                        fs::remove_file(&path)
+                            .map_err(|e| format!("删除会话日志文件失败: {}", e))?;
+                        println!("[delete_droid_session] 已删除: {:?}", path);
+                        
+                        // 删除对应的 .settings.json 文件
+                        let settings_file = path.with_extension("settings.json");
+                        if settings_file.exists() {
+                            fs::remove_file(&settings_file)
+                                .map_err(|e| format!("删除会话设置文件失败: {}", e))?;
+                            println!("[delete_droid_session] 已删除: {:?}", settings_file);
+                        }
+                        
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+        Ok(false)
     }
     
-    // 删除 .settings.json 文件
-    let settings_file = sessions_dir.join(format!("{}.settings.json", session_id));
-    if settings_file.exists() {
-        fs::remove_file(&settings_file)
-            .map_err(|e| format!("删除会话设置文件失败: {}", e))?;
-        println!("[delete_droid_session] 已删除: {:?}", settings_file);
+    let found = find_and_delete_session(&sessions_dir, &session_id)?;
+    if !found {
+        return Err(format!("未找到会话: {}", session_id));
     }
     
     Ok(())
