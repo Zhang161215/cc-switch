@@ -808,6 +808,16 @@ export const tauriAPI = {
     }
   },
 
+  // 保存自定义模型到 Factory settings.json
+  saveFactoryCustomModels: async (models: any[]): Promise<void> => {
+    try {
+      await invoke("save_factory_custom_models", { models });
+    } catch (error) {
+      console.error("保存 Factory 自定义模型失败:", error);
+      throw error;
+    }
+  },
+
   // 删除 Factory 配置中的自定义模型
   deleteFactoryCustomModel: async (modelDisplayName: string): Promise<void> => {
     try {

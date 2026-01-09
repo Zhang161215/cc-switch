@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Settings,
   ChevronDown,
@@ -12,7 +12,7 @@ import {
   EyeOff,
   Star,
 } from "lucide-react";
-import { DroidConfig, DroidCustomModel } from "../types";
+import { FactoryCustomModelWithId } from "../types";
 import { isLinux } from "../lib/platform";
 
 interface FactoryConfigEditorProps {
@@ -26,12 +26,10 @@ interface FactoryConfigEditorProps {
 const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
   onNotify,
 }) => {
-  const [config, setConfig] = useState<DroidConfig | null>(null);
+  const [models, setModels] = useState<FactoryCustomModelWithId[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [editingModel, setEditingModel] = useState<DroidCustomModel | null>(
-    null,
-  );
+  const [editingModel, setEditingModel] = useState<FactoryCustomModelWithId | null>(null);
   const [editingIndex, setEditingIndex] = useState<number>(-1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -42,8 +40,8 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
   const loadConfig = async () => {
     setIsLoading(true);
     try {
-      const factoryConfig = await window.api.getFactoryConfig();
-      setConfig(factoryConfig);
+      const customModels = await window.api.getFactoryCustomModelsWithId();
+      setModels(customModels);
       // 加载默认模型
       const defaultModelId = await window.api.getDroidDefaultModel();
       setDefaultModel(defaultModelId);
@@ -55,19 +53,13 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
     }
   };
 
-  // 构建模型 ID
-  const buildModelId = (model: DroidCustomModel, index: number): string => {
-    return `custom:${model.model_display_name}-${index}`;
-  };
-
   // 设置默认模型
-  const handleSetDefaultModel = async (model: DroidCustomModel, index: number) => {
-    const modelId = buildModelId(model, index);
+  const handleSetDefaultModel = async (model: FactoryCustomModelWithId) => {
     setSavingDefault(true);
     try {
-      await window.api.setDroidDefaultModel(modelId);
-      setDefaultModel(modelId);
-      onNotify?.(`已设置 ${model.model_display_name} 为默认模型`, "success");
+      await window.api.setDroidDefaultModel(model.id);
+      setDefaultModel(model.id);
+      onNotify?.(`已设置 ${model.displayName} 为默认模型`, "success");
     } catch (error) {
       onNotify?.(`设置失败: ${error}`, "error");
     } finally {
@@ -77,35 +69,37 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
 
   // 获取默认模型显示名称
   const getDefaultModelName = (): string | null => {
-    if (!defaultModel || !config) return null;
-    const match = defaultModel.match(/^custom:(.+)-(\d+)$/);
-    if (match) {
-      return match[1];
-    }
-    return null;
+    if (!defaultModel || models.length === 0) return null;
+    const model = models.find(m => m.id === defaultModel);
+    return model?.displayName || null;
   };
 
   useEffect(() => {
     loadConfig();
   }, []);
 
+  // 创建新模型的默认值
+  const createEmptyModel = (index: number): FactoryCustomModelWithId => ({
+    id: "",  // 将在保存时生成
+    displayName: "",
+    model: "",
+    baseUrl: "",
+    apiKey: "",
+    provider: "anthropic",
+    index: index,
+    maxOutputTokens: 8192,
+    noImageSupport: false,
+  });
+
   // 打开添加模型对话框
   const handleAddModel = () => {
-    setEditingModel({
-      model_display_name: "",
-      model: "",
-      base_url: "",
-      api_key: "",
-      provider: "anthropic",
-      max_tokens: 8192,
-      supports_prompt_caching: false,
-    });
+    setEditingModel(createEmptyModel(models.length));
     setEditingIndex(-1);
     setIsModalOpen(true);
   };
 
   // 打开编辑模型对话框
-  const handleEditModel = (model: DroidCustomModel, index: number) => {
+  const handleEditModel = (model: FactoryCustomModelWithId, index: number) => {
     setEditingModel({ ...model });
     setEditingIndex(index);
     setIsModalOpen(true);
@@ -113,14 +107,14 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
 
   // 保存模型
   const handleSaveModel = async () => {
-    if (!editingModel || !config) return;
+    if (!editingModel) return;
 
     // 验证必填字段
     if (
-      !editingModel.model_display_name ||
+      !editingModel.displayName ||
       !editingModel.model ||
-      !editingModel.base_url ||
-      !editingModel.api_key ||
+      !editingModel.baseUrl ||
+      !editingModel.apiKey ||
       !editingModel.provider
     ) {
       onNotify?.("请填写所有必填字段", "error");
@@ -128,18 +122,27 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
     }
 
     try {
-      const newModels = [...config.custom_models];
+      const newModels = [...models];
+      
       if (editingIndex >= 0) {
-        // 编辑现有模型
-        newModels[editingIndex] = editingModel;
+        // 编辑现有模型 - 保持原有 id
+        newModels[editingIndex] = {
+          ...editingModel,
+          index: editingIndex,
+        };
       } else {
-        // 添加新模型
-        newModels.push(editingModel);
+        // 添加新模型 - 生成新 id
+        const newIndex = models.length;
+        const newModel: FactoryCustomModelWithId = {
+          ...editingModel,
+          id: `custom:${editingModel.displayName}-${newIndex}`,
+          index: newIndex,
+        };
+        newModels.push(newModel);
       }
 
-      const newConfig = { ...config, custom_models: newModels };
-      await window.api.saveFactoryConfig(newConfig);
-      setConfig(newConfig);
+      await window.api.saveFactoryCustomModels(newModels);
+      setModels(newModels);
       setIsModalOpen(false);
       onNotify?.("模型配置已保存", "success", 2000);
     } catch (error) {
@@ -150,15 +153,19 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
 
   // 删除模型
   const handleDeleteModel = async (index: number) => {
-    if (!config) return;
-
     if (!window.confirm("确定要删除这个模型配置吗？")) return;
 
     try {
-      const newModels = config.custom_models.filter((_, i) => i !== index);
-      const newConfig = { ...config, custom_models: newModels };
-      await window.api.saveFactoryConfig(newConfig);
-      setConfig(newConfig);
+      const newModels = models.filter((_, i) => i !== index);
+      // 重新分配 index
+      const reindexedModels = newModels.map((m, i) => ({
+        ...m,
+        index: i,
+        id: `custom:${m.displayName}-${i}`,
+      }));
+      
+      await window.api.saveFactoryCustomModels(reindexedModels);
+      setModels(reindexedModels);
       onNotify?.("模型已删除", "success", 2000);
     } catch (error) {
       console.error("删除模型失败:", error);
@@ -177,8 +184,6 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
     );
   }
 
-  if (!config) return null;
-
   const defaultModelName = getDefaultModelName();
 
   return (
@@ -195,7 +200,7 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
               Factory 自定义模型配置
             </span>
             <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded flex-shrink-0">
-              {config.custom_models.length} 个
+              {models.length} 个
             </span>
             {defaultModelName && (
               <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded truncate">
@@ -203,37 +208,38 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
               </span>
             )}
           </div>
-          {isExpanded ? (
-            <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0 ml-2" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0 ml-2" />
-          )}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isExpanded ? (
+              <ChevronUp className="h-4 w-4 text-gray-500" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-gray-500" />
+            )}
+          </div>
         </button>
 
-        {/* 配置内容 */}
+        {/* 展开内容 */}
         {isExpanded && (
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
-            {/* 添加按钮 */}
-            <div className="flex justify-end">
+          <div className="p-3 pt-0 border-t border-gray-200 dark:border-gray-700">
+            {/* 添加模型按钮 */}
+            <div className="flex justify-end mb-3 mt-3">
               <button
                 onClick={handleAddModel}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors text-xs font-medium"
+                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-purple-500 hover:bg-purple-600 text-white rounded-md transition-colors"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-4 w-4" />
                 添加模型
               </button>
             </div>
 
             {/* 模型列表 */}
-            {config.custom_models.length === 0 ? (
+            {models.length === 0 ? (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 暂无自定义模型配置
               </div>
             ) : (
               <div className="space-y-2">
-                {config.custom_models.map((model, index) => {
-                  const modelId = buildModelId(model, index);
-                  const isDefault = defaultModel === modelId;
+                {models.map((model, index) => {
+                  const isDefault = defaultModel === model.id;
                   return (
                   <div
                     key={index}
@@ -246,7 +252,7 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-900 dark:text-gray-100">
-                          {model.model_display_name}
+                          {model.displayName}
                         </span>
                         {isDefault && (
                           <span className="text-xs px-1.5 py-0.5 bg-yellow-200 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-200 rounded flex items-center gap-1">
@@ -259,13 +265,13 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
                         {model.provider} · {model.model}
                       </div>
                       <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
-                        {model.base_url}
+                        {model.baseUrl}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 ml-4">
                       {!isDefault && (
                         <button
-                          onClick={() => handleSetDefaultModel(model, index)}
+                          onClick={() => handleSetDefaultModel(model)}
                           disabled={savingDefault}
                           className="p-2 text-gray-400 hover:text-yellow-500 hover:bg-yellow-100 dark:hover:bg-yellow-900/20 rounded-md transition-colors"
                           title="设为默认"
@@ -293,72 +299,52 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
                 })}
               </div>
             )}
-
-            {/* 配置文件路径 */}
-            <div className="pt-2 text-xs text-gray-500 dark:text-gray-400">
-              配置文件:{" "}
-              <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">
-                ~/.factory/config.json
-              </code>
-            </div>
           </div>
         )}
       </div>
 
-      {/* 编辑模型对话框 */}
+      {/* 模型编辑对话框 */}
       {isModalOpen && editingModel && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setIsModalOpen(false);
-          }}
-        >
-          {/* Backdrop */}
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div
-            className={`absolute inset-0 bg-black/50 dark:bg-black/70${isLinux() ? "" : " backdrop-blur-sm"}`}
-          />
-
-          {/* Modal */}
-          <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                {editingIndex >= 0 ? "编辑自定义模型" : "添加自定义模型"}
-              </h2>
+            className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4 ${isLinux() ? "max-h-[80vh] overflow-y-auto" : ""}`}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {editingIndex >= 0 ? "编辑模型" : "添加模型"}
+              </h3>
               <button
-                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
               >
-                <X size={18} />
+                <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-auto p-6 space-y-4">
-              {/* model_display_name */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                  模型显示名称 <span className="text-red-500">*</span>
+            <div className="p-4 space-y-4">
+              {/* 显示名称 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  显示名称 *
                 </label>
                 <input
                   type="text"
-                  value={editingModel.model_display_name}
+                  value={editingModel.displayName}
                   onChange={(e) =>
                     setEditingModel({
                       ...editingModel,
-                      model_display_name: e.target.value,
+                      displayName: e.target.value,
                     })
                   }
-                  placeholder="例如: Sonnet 4.5"
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="例如: Claude Opus 4.5"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
 
-              {/* model */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                  模型标识 <span className="text-red-500">*</span>
+              {/* 模型 ID */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  模型 ID *
                 </label>
                 <input
                   type="text"
@@ -366,15 +352,66 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
                   onChange={(e) =>
                     setEditingModel({ ...editingModel, model: e.target.value })
                   }
-                  placeholder="例如: claude-sonnet-4-5-20250929"
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="例如: claude-opus-4-5-20251101"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
 
-              {/* provider */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                  提供商 <span className="text-red-500">*</span>
+              {/* Base URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Base URL *
+                </label>
+                <input
+                  type="text"
+                  value={editingModel.baseUrl}
+                  onChange={(e) =>
+                    setEditingModel({
+                      ...editingModel,
+                      baseUrl: e.target.value,
+                    })
+                  }
+                  placeholder="例如: https://api.anthropic.com"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* API Key */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  API Key *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showApiKey ? "text" : "password"}
+                    value={editingModel.apiKey}
+                    onChange={(e) =>
+                      setEditingModel({
+                        ...editingModel,
+                        apiKey: e.target.value,
+                      })
+                    }
+                    placeholder="输入 API Key"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    {showApiKey ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Provider */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Provider *
                 </label>
                 <select
                   value={editingModel.provider}
@@ -384,121 +421,48 @@ const FactoryConfigEditor: React.FC<FactoryConfigEditorProps> = ({
                       provider: e.target.value,
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  <option value="anthropic">anthropic</option>
-                  <option value="openai">openai</option>
-                  <option value="generic-chat-completion-api">
-                    generic-chat-completion-api
-                  </option>
+                  <option value="anthropic">Anthropic</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="generic-chat-completion-api">Generic Chat Completion</option>
                 </select>
               </div>
 
-              {/* base_url */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                  API 端点 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="url"
-                  value={editingModel.base_url}
-                  onChange={(e) =>
-                    setEditingModel({
-                      ...editingModel,
-                      base_url: e.target.value,
-                    })
-                  }
-                  placeholder="例如: https://api.anthropic.com"
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-
-              {/* api_key */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                  API Key <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showApiKey ? "text" : "password"}
-                    value={editingModel.api_key}
-                    onChange={(e) =>
-                      setEditingModel({
-                        ...editingModel,
-                        api_key: e.target.value,
-                      })
-                    }
-                    placeholder="sk-ant-..."
-                    autoComplete="off"
-                    className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                  {editingModel.api_key && (
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                      aria-label={showApiKey ? "隐藏 API Key" : "显示 API Key"}
-                    >
-                      {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* max_tokens */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                  最大令牌数
+              {/* Max Output Tokens */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  最大输出 Tokens
                 </label>
                 <input
                   type="number"
-                  value={editingModel.max_tokens || 8192}
+                  value={editingModel.maxOutputTokens || ""}
                   onChange={(e) =>
                     setEditingModel({
                       ...editingModel,
-                      max_tokens: parseInt(e.target.value) || 8192,
+                      maxOutputTokens: e.target.value
+                        ? parseInt(e.target.value)
+                        : undefined,
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="例如: 8192"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
-              </div>
-
-              {/* supports_prompt_caching */}
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="supports_prompt_caching"
-                  checked={editingModel.supports_prompt_caching || false}
-                  onChange={(e) =>
-                    setEditingModel({
-                      ...editingModel,
-                      supports_prompt_caching: e.target.checked,
-                    })
-                  }
-                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-500 focus:ring-blue-500"
-                />
-                <label
-                  htmlFor="supports_prompt_caching"
-                  className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
-                >
-                  支持提示词缓存
-                </label>
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
+            <div className="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
               >
                 取消
               </button>
               <button
                 onClick={handleSaveModel}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors text-sm font-medium"
+                className="flex items-center gap-1 px-4 py-2 text-sm bg-purple-500 hover:bg-purple-600 text-white rounded-md transition-colors"
               >
-                <Save className="w-4 h-4" />
+                <Save className="h-4 w-4" />
                 保存
               </button>
             </div>

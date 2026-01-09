@@ -535,12 +535,22 @@ pub struct SessionDefaultSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FactoryCustomModelWithId {
+    #[serde(default)]
     pub id: String,
+    #[serde(default)]
     pub display_name: String,
     pub model: String,
     pub base_url: String,
     #[serde(default)]
+    pub api_key: String,
+    #[serde(default)]
     pub provider: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_output_tokens: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub no_image_support: Option<bool>,
 }
 
 /// Factory Settings 结构 (~/.factory/settings.json)
@@ -592,6 +602,41 @@ pub fn write_factory_settings(settings: &FactorySettings) -> Result<(), String> 
     
     let content = serde_json::to_string_pretty(settings)
         .map_err(|e| format!("序列化 Factory settings 失败: {}", e))?;
+    
+    fs::write(&settings_path, content)
+        .map_err(|e| format!("写入 Factory settings.json 失败: {}", e))?;
+    
+    Ok(())
+}
+
+/// 保存 customModels 到 settings.json（保留其他字段）
+pub fn save_custom_models_to_settings(models: &[FactoryCustomModelWithId]) -> Result<(), String> {
+    let settings_path = get_factory_settings_path()?;
+    let config_dir = get_factory_config_dir()?;
+    
+    // Ensure directory exists
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir)
+            .map_err(|e| format!("创建 .factory 目录失败: {}", e))?;
+    }
+    
+    // 读取现有 settings.json 以保留其他字段
+    let mut json_value: Value = if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path)
+            .map_err(|e| format!("读取 Factory settings.json 失败: {}", e))?;
+        serde_json::from_str(&content).unwrap_or(Value::Object(serde_json::Map::new()))
+    } else {
+        Value::Object(serde_json::Map::new())
+    };
+    
+    // 更新 customModels 字段
+    let models_value = serde_json::to_value(models)
+        .map_err(|e| format!("序列化 customModels 失败: {}", e))?;
+    json_value["customModels"] = models_value;
+    
+    // 写回文件
+    let content = serde_json::to_string_pretty(&json_value)
+        .map_err(|e| format!("序列化 settings.json 失败: {}", e))?;
     
     fs::write(&settings_path, content)
         .map_err(|e| format!("写入 Factory settings.json 失败: {}", e))?;

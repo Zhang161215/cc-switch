@@ -154,7 +154,8 @@ declare global {
         config: import("./types").DroidConfig,
       ) => Promise<void>;
       getFactoryCustomModels: () => Promise<any[]>;
-      getFactoryCustomModelsWithId: () => Promise<any[]>;
+      getFactoryCustomModelsWithId: () => Promise<import("./types").FactoryCustomModelWithId[]>;
+      saveFactoryCustomModels: (models: import("./types").FactoryCustomModelWithId[]) => Promise<void>;
       deleteFactoryCustomModel: (modelDisplayName: string) => Promise<void>;
       updateFactoryCustomModel: (
         oldDisplayName: string,

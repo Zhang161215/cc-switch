@@ -117,7 +117,11 @@ export interface FactoryCustomModelWithId {
   displayName: string;
   model: string;
   baseUrl: string;
+  apiKey: string;
   provider: string;
+  index?: number;
+  maxOutputTokens?: number;
+  noImageSupport?: boolean;
 }
 
 // Droid 配置（对应 .factory/config.json）

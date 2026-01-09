@@ -463,6 +463,7 @@ pub fn run() {
             commands::save_factory_config,
             commands::get_factory_custom_models,
             commands::get_factory_custom_models_with_id,
+            commands::save_factory_custom_models,
             commands::delete_factory_custom_model,
             commands::update_factory_custom_model,
             commands::set_factory_api_key_env,
